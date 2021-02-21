@@ -12,12 +12,51 @@ typedef struct Point
 
 int main(int argc, char **argv)
 {
-    printf("Num threads = %d ; Max threads = %d\n",omp_get_num_threads(),omp_get_max_threads());
+    printf("Maximum number of Threads = %d\n", omp_get_max_threads());
     srand(69420);
-    int k = 20,n=1000000,max_executions=8;
+    int stdin_input;
 
-    point* points;
-    points = (point*) malloc(sizeof(struct Point) * n);
+    int k = 2;
+    stdin_input = 0;
+    printf("Number of Clusters (as an integer bigger than 1):\n");
+    scanf("%d", &stdin_input);
+    if (stdin_input < 2)
+    {
+        printf("Invalid number of Clusters, defaulting to 2\n");
+    }
+    else
+    {
+        k = stdin_input;
+    }
+
+    int n = 10;
+    stdin_input = 0;
+    printf("Number of Points (as an integer bigger than 9):\n");
+    scanf("%d", &stdin_input);
+    if (stdin_input < 10)
+    {
+        printf("Invalid number of Points, defaulting to 10\n");
+    }
+    else
+    {
+        n = stdin_input;
+    }
+
+    int max_executions = 1;
+    stdin_input = 0;
+    printf("Number of Executions (as an integer bigger than 0):\n");
+    scanf("%d", &stdin_input);
+    if (stdin_input < 10)
+    {
+        printf("Invalid number of Executions, defaulting to 1\n");
+    }
+    else
+    {
+        max_executions = stdin_input;
+    }
+
+    point *points;
+    points = (point *)malloc(sizeof(struct Point) * n);
 
     for (int i = 0; i < n; i++)
     {
@@ -25,101 +64,122 @@ int main(int argc, char **argv)
         points[i].y = (double)rand() / (double)(RAND_MAX / 10);
     }
 
-    point centroids[k], centroid_original[k];
+    point centroids[k], original_centroids[k];
 
     for (int i = 0; i < k; i++)
     {
-        centroids[i].x = centroid_original[i].x = (double)rand() / (double)(RAND_MAX / 10);
-        centroids[i].y = centroid_original[i].y = (double)rand() / (double)(RAND_MAX / 10);
+        centroids[i].x = original_centroids[i].x = (double)rand() / (double)(RAND_MAX / 10);
+        centroids[i].y = original_centroids[i].y = (double)rand() / (double)(RAND_MAX / 10);
     }
 
-
-    point** clusters;
-    clusters = (point**) malloc(sizeof(point*) * k);
-    for(int i=0;i<k;i++){
-        clusters[i] = (point*) malloc(sizeof(struct Point) * n);
+    point **clusters;
+    clusters = (point **)malloc(sizeof(point *) * k);
+    for (int i = 0; i < k; i++)
+    {
+        clusters[i] = (point *)malloc(sizeof(struct Point) * n);
     }
 
     double meanExecTime = 0;
     int execution = 0;
 
-    while(execution<max_executions) {
+    point previous_centroids[k];
+    int iterations = 0, changed = 1;
 
-        for(int tryhard=0;tryhard<k;tryhard++){
-            centroids[tryhard].x=centroid_original[tryhard].x;
-            centroids[tryhard].y=centroid_original[tryhard].y;
+    while (execution < max_executions)
+    {
+
+        for (int i = 0; i < k; i++)
+        {
+            centroids[i].x = original_centroids[i].x;
+            centroids[i].y = original_centroids[i].y;
         }
 
-        point centroids_anteriores[k];
-        int iteracoes = 0, mudou = 1;
+        changed = 1;
+        iterations = 0;
 
         double b4 = omp_get_wtime();
-        for (; mudou; iteracoes++) {
+        for (; changed; iterations++)
+        {
             int clusters_size[k];
-            for (int i = 0; i < k; i++) {
+            for (int i = 0; i < k; i++)
+            {
                 clusters_size[i] = 0;
             }
 
             #pragma omp parallel for schedule(static)
-            for (int i = 0; i < n; i++) {
-                int cluster_closest_to = 0, onde_escrever;
+            for (int i = 0; i < n; i++)
+            {
+                int cluster_closest_to = 0, point_write_position;
                 double distance, smallest_distance;
-                for (int j = 0; j < k; j++) {
+                for (int j = 0; j < k; j++)
+                {
                     distance = sqrt(powf((centroids[j].x - points[i].x), 2) + powf((centroids[j].y - points[i].y), 2));
-                    if (j == 0) {
+                    if (j == 0)
+                    {
                         smallest_distance = distance;
-                    } else {
-                        if (distance < smallest_distance) {
+                    }
+                    else
+                    {
+                        if (distance < smallest_distance)
+                        {
                             smallest_distance = distance;
                             cluster_closest_to = j;
                         }
                     }
                 }
                 #pragma omp critical
-                onde_escrever = clusters_size[cluster_closest_to]++;
+                point_write_position = clusters_size[cluster_closest_to]++;
 
-                clusters[cluster_closest_to][onde_escrever] = points[i];
+                clusters[cluster_closest_to][point_write_position] = points[i];
             }
 
-            int mudou_ou_nao = 1;
+            int has_changed = 1;
 
             #pragma omp parallel for schedule(dynamic)
-            for (int i = 0; i < k; i++) {
+            for (int i = 0; i < k; i++)
+            {
                 double x = 0, y = 0;
-                for (int j = 0; j < clusters_size[i]; j++) {
+                for (int j = 0; j < clusters_size[i]; j++)
+                {
                     x += clusters[i][j].x;
                     y += clusters[i][j].y;
                 }
-                if (!(x == 0 && y == 0)) {
-                    centroids_anteriores[i] = centroids[i];
-                    centroids[i].x = (double) x / clusters_size[i];
-                    centroids[i].y = (double) y / clusters_size[i];
+                if (!(x == 0 && y == 0))
+                {
+                    previous_centroids[i] = centroids[i];
+                    centroids[i].x = (double)x / clusters_size[i];
+                    centroids[i].y = (double)y / clusters_size[i];
 
-                    if (!(((centroids_anteriores[i].x - 0.00001f) < centroids[i].x &&
-                           (centroids_anteriores[i].x + 0.00001f) > centroids[i].x)
-                          &&
-                          ((centroids_anteriores[i].y - 0.00001f) < centroids[i].y &&
-                           (centroids_anteriores[i].y + 0.00001f) > centroids[i].y))) {
-                        mudou_ou_nao = 0;
+                    if (!(((previous_centroids[i].x - 0.00001f) < centroids[i].x && (previous_centroids[i].x + 0.00001f) > centroids[i].x) &&
+                          ((previous_centroids[i].y - 0.00001f) < centroids[i].y && (previous_centroids[i].y + 0.00001f) > centroids[i].y)))
+                    {
+                        has_changed = 0;
                     }
                 }
             }
 
-            mudou = !mudou_ou_nao;
+            changed = !has_changed;
         }
 
-        double auxiasda = (omp_get_wtime()-b4);
-        printf("Media = %f segundos -> iteracao = %d\n",auxiasda,execution);
+        double time_delta = (omp_get_wtime() - b4);
+        printf("Time = %f seconds | execution = %d\n", time_delta, execution + 1);
 
-        meanExecTime += auxiasda;
+        meanExecTime += time_delta;
         execution++;
-
     }
 
-    printf("%d execucoes\nMedia = %f segundos\n",execution,meanExecTime/execution);
+    printf("Average time of the %d executions: %f\n", execution, meanExecTime / execution);
 
-    for(int i=0;i<k;i++){
-        printf("Centroide %d -> (%f,%f)\n",i,centroids[i].x,centroids[i].y);
+    stdin_input = 0;
+    printf("If you want to see the results please insert '1'\n");
+    scanf("%d", &stdin_input);
+    if (stdin_input == 1)
+    {
+        for (int i = 0; i < k; i++)
+        {
+            printf("Centroid %d -> (%f,%f)\n", i, centroids[i].x, centroids[i].y);
+        }
+        printf("The algorithm converged in %d iterations\n", iterations);
     }
 
     return 0;
