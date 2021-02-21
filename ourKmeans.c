@@ -44,7 +44,7 @@ int main(int argc, char **argv)
     stdin_input = 0;
     printf("Number of Executions (as an integer bigger than 0):\n");
     scanf("%d", &stdin_input);
-    if (stdin_input < 10)
+    if (stdin_input < 1)
     {
         printf("Invalid number of Executions, defaulting to 1\n");
     }
