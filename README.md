@@ -16,4 +16,4 @@ C implementation of the popular clustering algorithm K-Means, the code was writt
 ### To compile
 `make parallel2`
 ### To run
-`make parallel2run`
+`make parallelrun2`
