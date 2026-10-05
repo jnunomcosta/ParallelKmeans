@@ -39,6 +39,12 @@ void panel_theme(void)
     GuiSetStyle(DEFAULT, TEXT_COLOR_DISABLED, ColorToInt(dim));
 }
 
+#ifdef PLATFORM_WEB
+#define N_MAX WEB_MAX_N
+#else
+#define N_MAX 2000000
+#endif
+
 #define ROW_H 24.0f
 #define ROW_GAP 4.0f
 #define LABEL_W 78.0f
@@ -86,8 +92,10 @@ PanelAction panel_draw(App *app, Rectangle area)
     Rectangle r_spread = labelled(&c, "Spread");
     Rectangle r_k = labelled(&c, "k");
     Rectangle r_init = labelled(&c, "Init");
+#ifndef PLATFORM_WEB
     Rectangle r_impl = labelled(&c, "Impl");
     Rectangle r_threads = labelled(&c, "Threads");
+#endif
     Rectangle r_seed = labelled(&c, "Seed");
     Rectangle r_iter = labelled(&c, "Max iter");
     Rectangle r_tol = labelled(&c, "Tol");
@@ -98,11 +106,11 @@ PanelAction panel_draw(App *app, Rectangle area)
 
     /* n: spinner plus a log-scale slider */
     int n = (int)app->gen.n;
-    if (GuiSpinner(r_n, NULL, &n, 100, 2000000, ps->ed_n))
+    if (GuiSpinner(r_n, NULL, &n, 100, N_MAX, ps->ed_n))
         ps->ed_n = !ps->ed_n;
     float logn = log10f((float)n);
     float old_logn = logn;
-    GuiSlider(r_nslider, NULL, NULL, &logn, 2.0f, log10f(2000000.0f));
+    GuiSlider(r_nslider, NULL, NULL, &logn, 2.0f, log10f((float)N_MAX));
     if (logn != old_logn)
     {
         float v = powf(10.0f, logn);
@@ -126,6 +134,7 @@ PanelAction panel_draw(App *app, Rectangle area)
     snprintf(buf, sizeof buf, "%zu", app->cfg.k);
     DrawText(buf, (int)(r_k.x + r_k.width - 20), (int)r_k.y + 5, 14, WHITE);
 
+#ifndef PLATFORM_WEB
     int impl = (int)app->cfg.impl;
     GuiToggleGroup((Rectangle){r_impl.x, r_impl.y, r_impl.width / 2 - 1, r_impl.height}, "seq;omp",
                    &impl);
@@ -141,6 +150,7 @@ PanelAction panel_draw(App *app, Rectangle area)
     app->cfg.threads = (int)lroundf(tf);
     snprintf(buf, sizeof buf, "%d", app->cfg.threads);
     DrawText(buf, (int)(r_threads.x + r_threads.width - 20), (int)r_threads.y + 5, 14, WHITE);
+#endif
 
     int seed = (int)(app->gen.seed & 0x7fffffff);
     if (GuiValueBox(r_seed, NULL, &seed, 0, 2147483647, ps->ed_seed))
@@ -166,8 +176,10 @@ PanelAction panel_draw(App *app, Rectangle area)
         action = PANEL_RUN;
 
     Rectangle cp = next_row(&c);
+#ifndef PLATFORM_WEB
     if (GuiButton((Rectangle){cp.x, cp.y, bw, cp.height}, "Compare"))
         action = PANEL_COMPARE;
+#endif
     if (app->img.active)
         GuiDisable();
     if (GuiButton((Rectangle){cp.x + bw + 4, cp.y, bw, cp.height}, "Clear points"))

@@ -1,5 +1,11 @@
 include(FetchContent)
 
+if(EMSCRIPTEN)
+    set(PLATFORM Web CACHE STRING "" FORCE)
+    # raylib's miniaudio uses EM_ASM, which needs -std=gnu*.
+    set(CMAKE_C_EXTENSIONS ON)
+endif()
+
 set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(BUILD_GAMES OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_WAYLAND OFF CACHE BOOL "" FORCE)
@@ -15,7 +21,9 @@ FetchContent_Declare(raygui GIT_REPOSITORY https://github.com/raysan5/raygui.git
                             GIT_SHALLOW TRUE SOURCE_SUBDIR none)
 FetchContent_MakeAvailable(raygui)
 
-find_package(Threads REQUIRED)
+if(NOT EMSCRIPTEN)
+    find_package(Threads REQUIRED)
+endif()
 
 # raygui produces warnings, so its implementation is built without our warning flags.
 add_library(raygui_impl STATIC raygui_impl.c)
@@ -25,5 +33,16 @@ target_compile_options(raygui_impl PRIVATE -w)
 
 add_executable(kmeans_gui main.c runner.c view.c palette.c panel.c timeline.c stats.c image_mode.c)
 set_target_properties(kmeans_gui PROPERTIES OUTPUT_NAME kmeans-gui)
-target_link_libraries(kmeans_gui PRIVATE kmeans::kmeans raygui_impl raylib Threads::Threads m)
+target_link_libraries(kmeans_gui PRIVATE kmeans::kmeans raygui_impl raylib m)
 target_link_libraries(kmeans_gui PRIVATE kmeans_warnings)
+
+if(EMSCRIPTEN)
+    target_compile_options(kmeans_gui PRIVATE -Wno-unknown-pragmas)
+    set_target_properties(kmeans_gui PROPERTIES SUFFIX ".html")
+    target_link_options(kmeans_gui PRIVATE -sUSE_GLFW=3 -sALLOW_MEMORY_GROWTH=1 -sASYNCIFY=0
+                        --shell-file ${CMAKE_CURRENT_SOURCE_DIR}/web/shell.html)
+    set_target_properties(kmeans_gui PROPERTIES LINK_DEPENDS
+                          ${CMAKE_CURRENT_SOURCE_DIR}/web/shell.html)
+else()
+    target_link_libraries(kmeans_gui PRIVATE Threads::Threads)
+endif()

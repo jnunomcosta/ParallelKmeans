@@ -34,9 +34,18 @@ endif()
 
 enable_testing()
 
+if(EMSCRIPTEN)
+    # The web build is the GUI only, single-threaded (no OpenMP, no CLI, no tests).
+    set(KMEANS_GUI ON CACHE BOOL "Build the raylib GUI" FORCE)
+endif()
+
 add_subdirectory(src)
-add_subdirectory(apps/cli)
+if(NOT EMSCRIPTEN)
+    add_subdirectory(apps/cli)
+endif()
 if(KMEANS_GUI)
     add_subdirectory(apps/gui)
 endif()
-add_subdirectory(tests)
+if(NOT EMSCRIPTEN)
+    add_subdirectory(tests)
+endif()

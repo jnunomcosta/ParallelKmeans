@@ -71,6 +71,12 @@ typedef struct Runner
 
     atomic_bool cancel;
 
+    /* Web build: the job runs on the main thread, one iteration per runner_tick. */
+    unsigned iter_base; /* iterations already done; 0 except on web */
+    bool web_active;
+    float *web_state; /* centroids after the last iteration */
+    double web_seconds;
+
     /* Guarded by mu. */
     FrameList pending;
     RunInfo info;
@@ -81,6 +87,8 @@ void runner_init(Runner *r);
 int runner_start(Runner *r, const km_dataset *ds, const km_config *cfg);
 /* Same, for the seq-vs-omp comparison (tol = -1, max_iter = 20, no frames). */
 int runner_compare(Runner *r, const km_dataset *ds, const km_config *cfg);
+/* Web build only: runs one iteration of the current job; does nothing natively. */
+void runner_tick(Runner *r);
 /* Appends new frames to dst. Cheap. */
 void runner_poll(Runner *r, FrameList *dst);
 RunInfo runner_info(Runner *r);

@@ -102,6 +102,13 @@ static void draw_text(const App *app, Rectangle r)
         text("-", r.x, y, GRAY);
 }
 
+#ifdef PLATFORM_WEB
+static void draw_compare(const App *app, Rectangle r)
+{
+    (void)app;
+    text("web build: single-threaded", r.x, r.y, LIGHTGRAY);
+}
+#else
 static void draw_bar(Rectangle r, const char *label, double ms, double max_ms, Color c)
 {
     char buf[48];
@@ -138,6 +145,7 @@ static void draw_compare(const App *app, Rectangle r)
     snprintf(buf, sizeof buf, "speedup x%.1f on %d threads", sp, c->threads);
     text(buf, r.x, y + 60, WHITE);
 }
+#endif
 
 void stats_draw(const App *app, Rectangle area)
 {

@@ -15,6 +15,36 @@ static uint64_t splitmix64(uint64_t *x)
     return z ^ (z >> 31);
 }
 
+#ifdef PLATFORM_WEB
+/* GLSL ES 1.00 (WebGL 1): loops need constant bounds. */
+static const char *VORONOI_FS = "#version 100\n"
+                                "#ifdef GL_FRAGMENT_PRECISION_HIGH\n"
+                                "precision highp float;\n"
+                                "#else\n"
+                                "precision mediump float;\n"
+                                "#endif\n"
+                                "uniform vec2 centroids[32];\n"
+                                "uniform vec3 colors[32];\n"
+                                "uniform int count;\n"
+                                "uniform float alpha;\n"
+                                "void main()\n"
+                                "{\n"
+                                "    vec2 p = gl_FragCoord.xy;\n"
+                                "    float d1 = 1e10, d2 = 1e10;\n"
+                                "    vec3 col = vec3(0.0);\n"
+                                "    for (int i = 0; i < 32; i++)\n"
+                                "    {\n"
+                                "        if (i >= count) break;\n"
+                                "        float d = distance(p, centroids[i]);\n"
+                                "        if (d < d1) { d2 = d1; d1 = d; col = colors[i]; }\n"
+                                "        else if (d < d2) { d2 = d; }\n"
+                                "    }\n"
+                                "    if (d2 - d1 < 1.0)\n"
+                                "        gl_FragColor = vec4(col * 0.4, 0.6);\n"
+                                "    else\n"
+                                "        gl_FragColor = vec4(col, alpha);\n"
+                                "}\n";
+#else
 static const char *VORONOI_FS = "#version 330\n"
                                 "out vec4 finalColor;\n"
                                 "uniform vec2 centroids[32];\n"
@@ -37,6 +67,7 @@ static const char *VORONOI_FS = "#version 330\n"
                                 "    else\n"
                                 "        finalColor = vec4(colors[best], alpha);\n"
                                 "}\n";
+#endif
 
 static size_t ycol(const km_dataset *ds)
 {

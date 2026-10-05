@@ -10,6 +10,7 @@
 
 #define K_MAX 32
 #define DRAW_MAX 100000
+#define WEB_MAX_N 200000 /* point cap of the web build */
 #define PANEL_W 280
 #define TIMELINE_H 44
 #define STATS_H 170

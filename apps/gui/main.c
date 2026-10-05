@@ -9,6 +9,10 @@
 
 #include <raylib.h>
 
+#ifdef PLATFORM_WEB
+#include <emscripten/emscripten.h>
+#endif
+
 #include <ctype.h>
 #include <getopt.h>
 #include <math.h>
@@ -289,6 +293,10 @@ static int app_load_dataset(App *app, km_dataset *ds)
     {
     case SRC_CSV:
         err = km_dataset_load_csv(ds, app->source_path);
+#ifdef PLATFORM_WEB
+        if (err == KM_OK && ds->n > WEB_MAX_N)
+            ds->n = WEB_MAX_N; /* keep the first points only */
+#endif
         break;
     case SRC_IMAGE:
         return image_mode_load(&app->img, app->source_path, ds);
@@ -438,9 +446,139 @@ static void canvas_input(App *app)
     }
 }
 
+static Options o;
+static App app;
+static int status;
+static int settled;
+static bool quit;
+
+/* One iteration of the main loop. */
+static void frame(void)
+{
+    const Color bg = {24, 26, 30, 255};
+    runner_tick(&app.runner);
+    runner_poll(&app.runner, &app.frames);
+    app.info = runner_info(&app.runner);
+    if (!app.info.is_compare && app.info.status != RUN_IDLE)
+        app.last_run = app.info;
+    if (app.info.is_compare && app.info.compare_ready)
+    {
+        app.compare = app.info.compare;
+        app.has_compare = true;
+    }
+    if (o.screenshot)
+    {
+        /* Screenshots show --frame N (clamped), or the last frame. */
+        size_t last = app.frames.count ? app.frames.count - 1 : 0;
+        app.shown = (o.frame < 0 || (size_t)o.frame > last) ? last : (size_t)o.frame;
+    }
+    else
+        timeline_update(&app.timeline, &app.shown, app.frames.count, app.info.status != RUN_RUNNING,
+                        (double)GetFrameTime());
+    float cw = (float)(GetScreenWidth() - PANEL_W);
+    float ch = (float)(GetScreenHeight() - TIMELINE_H - STATS_H);
+    view_layout(&app.view, (Rectangle){PANEL_W, 0, cw, ch});
+
+    canvas_input(&app);
+
+    char line[160];
+    if (app.message[0])
+        snprintf(line, sizeof line, "%s", app.message);
+    else if (app.info.is_compare && app.info.status == RUN_RUNNING)
+        snprintf(line, sizeof line, "comparing seq vs omp...");
+    else if (app.info.is_compare && app.info.status == RUN_DONE)
+        snprintf(line, sizeof line, "comparison done");
+    else if (app.info.status == RUN_RUNNING)
+        snprintf(line, sizeof line, "running... iter %u", app.info.iterations);
+    else if (app.info.status == RUN_DONE)
+        snprintf(line, sizeof line, "done in %u iters", app.info.iterations);
+    else if (app.info.status == RUN_CANCELLED)
+        snprintf(line, sizeof line, "cancelled after %u iters", app.info.iterations);
+    else
+        snprintf(line, sizeof line, "error: %s", km_strerror(app.info.err));
+
+    BeginDrawing();
+    ClearBackground(bg);
+    DrawRectangle(0, 0, PANEL_W, GetScreenHeight(), (Color){32, 35, 40, 255});
+    DrawText("ParallelKmeans", 16, 16, 20, RAYWHITE);
+    DrawText(line, 16, 48, 16, LIGHTGRAY);
+    if (app.img.active)
+        image_mode_draw(&app.img, &app.ds, &app.frames, app.shown, app.run_k,
+                        (Rectangle){PANEL_W, 0, cw, ch});
+    else
+        view_draw(&app.view, &app.frames, app.shown, app.run_k, app.trails, app.voronoi);
+    timeline_draw(&app.timeline, &app.shown, app.frames.count,
+                  (Rectangle){PANEL_W, ch, cw, TIMELINE_H});
+    stats_draw(&app, (Rectangle){PANEL_W, ch + TIMELINE_H, cw, STATS_H});
+    PanelAction act = panel_draw(&app, (Rectangle){0, 0, PANEL_W, (float)GetScreenHeight()});
+    EndDrawing();
+
+    if (!app.panel.editing)
+    {
+        if (IsKeyPressed(KEY_G))
+            act = PANEL_GENERATE;
+        if (IsKeyPressed(KEY_R))
+            act = PANEL_RUN;
+        if (IsKeyPressed(KEY_V) && !app.img.active)
+            app.voronoi = !app.voronoi;
+        if (IsKeyPressed(KEY_T) && !app.img.active)
+            app.trails = !app.trails;
+        timeline_keys(&app.timeline, &app.shown, app.frames.count);
+    }
+    if (IsKeyPressed(KEY_ESCAPE))
+    {
+        if (app.info.status == RUN_RUNNING)
+            runner_cancel(&app.runner);
+#ifndef PLATFORM_WEB
+        else
+            quit = true;
+#endif
+    }
+#ifndef PLATFORM_WEB
+    if (WindowShouldClose())
+        quit = true;
+#endif
+    if (act == PANEL_GENERATE)
+        app_generate(&app);
+    else if (act == PANEL_RUN)
+        app_run(&app, NULL);
+    else if (act == PANEL_COMPARE)
+        app_compare(&app);
+    else if (act == PANEL_CLEAR)
+        app_clear(&app);
+
+    if (IsFileDropped())
+    {
+        FilePathList files = LoadDroppedFiles();
+        if (files.count > 0 && IsFileExtension(files.paths[0], ".csv"))
+            app_load_file(&app, files.paths[0], SRC_CSV);
+        else if (files.count > 0 && (IsFileExtension(files.paths[0], ".png") ||
+                                     IsFileExtension(files.paths[0], ".jpg") ||
+                                     IsFileExtension(files.paths[0], ".jpeg")))
+            app_load_file(&app, files.paths[0], SRC_IMAGE);
+        UnloadDroppedFiles(files);
+    }
+
+    if (o.screenshot && app.info.status != RUN_RUNNING && ++settled >= 5)
+    {
+        Image img = LoadImageFromScreen();
+        if (!ExportImage(img, o.screenshot))
+        {
+            fprintf(stderr, "kmeans-gui: could not write %s\n", o.screenshot);
+            status = 1;
+        }
+        UnloadImage(img);
+        quit = true;
+    }
+#ifdef PLATFORM_WEB
+    if (quit)
+        emscripten_cancel_main_loop();
+#endif
+}
+
 int main(int argc, char **argv)
 {
-    Options o = {0};
+    o = (Options){0};
     o.gen = km_gen_params_default();
     o.k = 8;
     o.impl = KM_IMPL_OMP;
@@ -453,7 +591,12 @@ int main(int argc, char **argv)
         return rc - 1;
 
     SetTraceLogLevel(LOG_WARNING);
+#ifdef PLATFORM_WEB
+    /* Fixed-size canvas, scaled by CSS: raylib's resizable web window skews the mouse. */
+    SetConfigFlags(FLAG_VSYNC_HINT);
+#else
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
+#endif
     InitWindow(o.width, o.height, "kmeans-gui");
     if (!IsWindowReady())
     {
@@ -462,11 +605,13 @@ int main(int argc, char **argv)
     }
     SetWindowMinSize(960, 600);
     SetExitKey(KEY_NULL);
+#ifndef PLATFORM_WEB
     SetTargetFPS(60);
+#endif
     panel_theme();
-    int status = 0;
+    status = 0;
 
-    App app = {0};
+    app = (App){0};
     app.gen = o.gen;
     app.cfg = km_config_default();
     app.cfg.k = o.k;
@@ -499,121 +644,13 @@ int main(int argc, char **argv)
     else
         app_run(&app, NULL);
 
-    const Color bg = {24, 26, 30, 255};
-    int settled = 0;
-    bool quit = false;
+#ifdef PLATFORM_WEB
+    if (status == 0)
+        emscripten_set_main_loop(frame, 0, 1);
+#else
     while (status == 0 && !quit)
-    {
-        runner_poll(&app.runner, &app.frames);
-        app.info = runner_info(&app.runner);
-        if (!app.info.is_compare && app.info.status != RUN_IDLE)
-            app.last_run = app.info;
-        if (app.info.is_compare && app.info.compare_ready)
-        {
-            app.compare = app.info.compare;
-            app.has_compare = true;
-        }
-        if (o.screenshot)
-        {
-            /* Screenshots show --frame N (clamped), or the last frame. */
-            size_t last = app.frames.count ? app.frames.count - 1 : 0;
-            app.shown = (o.frame < 0 || (size_t)o.frame > last) ? last : (size_t)o.frame;
-        }
-        else
-            timeline_update(&app.timeline, &app.shown, app.frames.count,
-                            app.info.status != RUN_RUNNING, (double)GetFrameTime());
-        float cw = (float)(GetScreenWidth() - PANEL_W);
-        float ch = (float)(GetScreenHeight() - TIMELINE_H - STATS_H);
-        view_layout(&app.view, (Rectangle){PANEL_W, 0, cw, ch});
-
-        canvas_input(&app);
-
-        char line[160];
-        if (app.message[0])
-            snprintf(line, sizeof line, "%s", app.message);
-        else if (app.info.is_compare && app.info.status == RUN_RUNNING)
-            snprintf(line, sizeof line, "comparing seq vs omp...");
-        else if (app.info.is_compare && app.info.status == RUN_DONE)
-            snprintf(line, sizeof line, "comparison done");
-        else if (app.info.status == RUN_RUNNING)
-            snprintf(line, sizeof line, "running... iter %u", app.info.iterations);
-        else if (app.info.status == RUN_DONE)
-            snprintf(line, sizeof line, "done in %u iters", app.info.iterations);
-        else if (app.info.status == RUN_CANCELLED)
-            snprintf(line, sizeof line, "cancelled after %u iters", app.info.iterations);
-        else
-            snprintf(line, sizeof line, "error: %s", km_strerror(app.info.err));
-
-        BeginDrawing();
-        ClearBackground(bg);
-        DrawRectangle(0, 0, PANEL_W, GetScreenHeight(), (Color){32, 35, 40, 255});
-        DrawText("ParallelKmeans", 16, 16, 20, RAYWHITE);
-        DrawText(line, 16, 48, 16, LIGHTGRAY);
-        if (app.img.active)
-            image_mode_draw(&app.img, &app.ds, &app.frames, app.shown, app.run_k,
-                            (Rectangle){PANEL_W, 0, cw, ch});
-        else
-            view_draw(&app.view, &app.frames, app.shown, app.run_k, app.trails, app.voronoi);
-        timeline_draw(&app.timeline, &app.shown, app.frames.count,
-                      (Rectangle){PANEL_W, ch, cw, TIMELINE_H});
-        stats_draw(&app, (Rectangle){PANEL_W, ch + TIMELINE_H, cw, STATS_H});
-        PanelAction act = panel_draw(&app, (Rectangle){0, 0, PANEL_W, (float)GetScreenHeight()});
-        EndDrawing();
-
-        if (!app.panel.editing)
-        {
-            if (IsKeyPressed(KEY_G))
-                act = PANEL_GENERATE;
-            if (IsKeyPressed(KEY_R))
-                act = PANEL_RUN;
-            if (IsKeyPressed(KEY_V) && !app.img.active)
-                app.voronoi = !app.voronoi;
-            if (IsKeyPressed(KEY_T) && !app.img.active)
-                app.trails = !app.trails;
-            timeline_keys(&app.timeline, &app.shown, app.frames.count);
-        }
-        if (IsKeyPressed(KEY_ESCAPE))
-        {
-            if (app.info.status == RUN_RUNNING)
-                runner_cancel(&app.runner);
-            else
-                quit = true;
-        }
-        if (WindowShouldClose())
-            quit = true;
-        if (act == PANEL_GENERATE)
-            app_generate(&app);
-        else if (act == PANEL_RUN)
-            app_run(&app, NULL);
-        else if (act == PANEL_COMPARE)
-            app_compare(&app);
-        else if (act == PANEL_CLEAR)
-            app_clear(&app);
-
-        if (IsFileDropped())
-        {
-            FilePathList files = LoadDroppedFiles();
-            if (files.count > 0 && IsFileExtension(files.paths[0], ".csv"))
-                app_load_file(&app, files.paths[0], SRC_CSV);
-            else if (files.count > 0 && (IsFileExtension(files.paths[0], ".png") ||
-                                         IsFileExtension(files.paths[0], ".jpg") ||
-                                         IsFileExtension(files.paths[0], ".jpeg")))
-                app_load_file(&app, files.paths[0], SRC_IMAGE);
-            UnloadDroppedFiles(files);
-        }
-
-        if (o.screenshot && app.info.status != RUN_RUNNING && ++settled >= 5)
-        {
-            Image img = LoadImageFromScreen();
-            if (!ExportImage(img, o.screenshot))
-            {
-                fprintf(stderr, "kmeans-gui: could not write %s\n", o.screenshot);
-                status = 1;
-            }
-            UnloadImage(img);
-            break;
-        }
-    }
+        frame();
+#endif
     runner_free(&app.runner);
     view_free(&app.view);
     image_mode_free(&app.img);

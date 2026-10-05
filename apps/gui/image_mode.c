@@ -25,6 +25,15 @@ int image_mode_load(ImageMode *im, const char *path, km_dataset *ds)
     Image img = LoadImage(path);
     if (!img.data)
         return KM_ERR_IO;
+#ifdef PLATFORM_WEB
+    /* The web build caps images at 512 px on the longest side. */
+    int longest = img.width > img.height ? img.width : img.height;
+    if (longest > 512)
+    {
+        int w = img.width * 512 / longest, h = img.height * 512 / longest;
+        ImageResize(&img, w > 0 ? w : 1, h > 0 ? h : 1);
+    }
+#endif
     ImageFormat(&img, PIXELFORMAT_UNCOMPRESSED_R8G8B8);
     if (img.width <= 0 || img.height <= 0)
     {

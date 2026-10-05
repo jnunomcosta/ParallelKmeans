@@ -54,15 +54,9 @@ static bool on_step(const km_step *s, void *user)
         pthread_mutex_unlock(&r->mu);
         return false;
     }
-    r->info.iterations = s->iteration;
+    r->info.iterations = r->iter_base + s->iteration;
     pthread_mutex_unlock(&r->mu);
     return !atomic_load(&r->cancel);
-}
-
-static bool on_step_cancel_only(const km_step *s, void *user)
-{
-    (void)s;
-    return !atomic_load(&((Runner *)user)->cancel);
 }
 
 static void finish(Runner *r, RunStatus status, int err)
@@ -71,6 +65,13 @@ static void finish(Runner *r, RunStatus status, int err)
     r->info.status = status;
     r->info.err = err;
     pthread_mutex_unlock(&r->mu);
+}
+
+#ifndef PLATFORM_WEB
+static bool on_step_cancel_only(const km_step *s, void *user)
+{
+    (void)s;
+    return !atomic_load(&((Runner *)user)->cancel);
 }
 
 static void *run_job(void *arg)
@@ -134,6 +135,8 @@ static void *compare_job(void *arg)
     return NULL;
 }
 
+#endif
+
 void runner_init(Runner *r)
 {
     memset(r, 0, sizeof *r);
@@ -147,8 +150,73 @@ void runner_cancel(Runner *r)
     atomic_store(&r->cancel, true);
 }
 
+#ifdef PLATFORM_WEB
+/* Ends the incremental job, keeping its last centroids as the final frame. */
+static void web_finish(Runner *r, RunStatus status, double inertia, bool converged)
+{
+    Frame last = {r->web_state, inertia, 0.0, 0.0};
+    r->web_state = NULL;
+    r->web_active = false;
+    if (!last.centroids) /* cancelled before the first iteration */
+    {
+        finish(r, status, KM_OK);
+        return;
+    }
+    pthread_mutex_lock(&r->mu);
+    bool ok = framelist_push(&r->pending, last);
+    r->info.converged = converged;
+    r->info.seconds = r->web_seconds;
+    pthread_mutex_unlock(&r->mu);
+    finish(r, ok ? status : RUN_ERROR, ok ? KM_OK : KM_ERR_NOMEM);
+}
+
+void runner_tick(Runner *r)
+{
+    if (!r->web_active)
+        return;
+    km_config c = r->cfg;
+    c.max_iter = 1;
+    if (r->iter_base > 0)
+    {
+        c.init = KM_INIT_GIVEN;
+        c.initial_centroids = r->web_state;
+    }
+    km_result res;
+    int err = km_run(&r->ds, &c, on_step, r, &res);
+    if (err != KM_OK)
+    {
+        free(r->web_state);
+        r->web_state = NULL;
+        r->web_active = false;
+        finish(r, RUN_ERROR, err);
+        return;
+    }
+    free(r->web_state);
+    r->web_state = res.centroids; /* take over the new centroids */
+    res.centroids = NULL;
+    r->iter_base++;
+    r->web_seconds += res.seconds;
+    double inertia = res.inertia;
+    bool converged = res.converged;
+    km_result_free(&res);
+    if (atomic_load(&r->cancel))
+        web_finish(r, RUN_CANCELLED, inertia, converged);
+    else if (converged || r->iter_base >= r->cfg.max_iter)
+        web_finish(r, RUN_DONE, inertia, converged);
+}
+#else
+void runner_tick(Runner *r)
+{
+    (void)r;
+}
+#endif
+
 void runner_join(Runner *r)
 {
+#ifdef PLATFORM_WEB
+    if (r->web_active)
+        web_finish(r, RUN_CANCELLED, 0.0, false);
+#endif
     if (r->started)
     {
         pthread_join(r->thread, NULL);
@@ -194,6 +262,19 @@ static int start(Runner *r, const km_dataset *ds, const km_config *cfg, bool com
     r->info.threads = cfg->impl == KM_IMPL_SEQ ? 1
                       : cfg->threads > 0       ? cfg->threads
                                                : km_max_threads();
+#ifdef PLATFORM_WEB
+    if (compare)
+    {
+        r->info.status = RUN_ERROR;
+        r->info.err = KM_ERR_ARG;
+        release_job(r);
+        return KM_ERR_ARG;
+    }
+    r->iter_base = 0;
+    r->web_seconds = 0.0;
+    r->web_active = true;
+    return KM_OK;
+#else
     if (pthread_create(&r->thread, NULL, compare ? compare_job : run_job, r) != 0)
     {
         r->info.status = RUN_ERROR;
@@ -203,6 +284,7 @@ static int start(Runner *r, const km_dataset *ds, const km_config *cfg, bool com
     }
     r->started = true;
     return KM_OK;
+#endif
 }
 
 int runner_start(Runner *r, const km_dataset *ds, const km_config *cfg)
