@@ -10,6 +10,7 @@
 #include <ctype.h>
 #include <getopt.h>
 #include <math.h>
+#include <raymath.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -241,6 +242,7 @@ static void app_run(App *app, const float *given)
     }
     if (given)
     {
+        cfg.k = app->run_k; /* the given centroids belong to the displayed run */
         cfg.init = KM_INIT_GIVEN;
         cfg.initial_centroids = given;
     }
@@ -271,13 +273,125 @@ static void app_generate(App *app)
     runner_join(&app->runner);
     km_dataset_free(&app->ds);
     app->ds = ds;
-    err = view_set_dataset(&app->view, &app->ds, app->gen.seed);
+    err = view_set_dataset(&app->view, &app->ds, app->gen.seed, false);
     if (err != KM_OK)
     {
         app_message(app, "view", err);
         return;
     }
     app_run(app, NULL);
+}
+
+static void app_stop(App *app)
+{
+    runner_cancel(&app->runner);
+    runner_join(&app->runner);
+    framelist_clear(&app->frames);
+    view_invalidate(&app->view);
+    app->shown = 0;
+}
+
+static void app_clear(App *app)
+{
+    app_stop(app);
+    km_dataset_free(&app->ds);
+    app->ds.dim = 2;
+    view_set_dataset(&app->view, &app->ds, app->gen.seed, true);
+    snprintf(app->message, sizeof app->message, "no points: paint some with Brush");
+}
+
+static void app_load_csv(App *app, const char *path)
+{
+    snprintf(app->csv_path, sizeof app->csv_path, "%s", path);
+    app->source = SRC_CSV;
+    app_generate(app);
+}
+
+static uint64_t splitmix64(uint64_t *x)
+{
+    uint64_t z = (*x += 0x9e3779b97f4a7c15ULL);
+    z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ULL;
+    z = (z ^ (z >> 27)) * 0x94d049bb133111ebULL;
+    return z ^ (z >> 31);
+}
+
+static float gaussian(uint64_t *state)
+{
+    uint64_t a = splitmix64(state), b = splitmix64(state);
+    double u1 = 1.0 - (double)(a >> 11) * (1.0 / 9007199254740992.0);
+    double u2 = (double)(b >> 11) * (1.0 / 9007199254740992.0);
+    return (float)(sqrt(-2.0 * log(u1)) * cos(6.283185307179586 * u2));
+}
+
+#define BRUSH_POINTS 20
+#define BRUSH_SIGMA 0.15f
+
+static void brush_paint(App *app, Vector2 world)
+{
+    if (app->ds.n > 0 && app->ds.dim != 2)
+        return;
+    size_t n = app->ds.n;
+    float *pts = realloc(app->ds.points, (n + BRUSH_POINTS) * 2 * sizeof(float));
+    if (!pts)
+        return;
+    app_stop(app); /* the points changed, so the frames no longer describe them */
+    app->ds.points = pts;
+    app->ds.dim = 2;
+    for (size_t i = 0; i < BRUSH_POINTS; i++)
+    {
+        pts[(n + i) * 2] = world.x + BRUSH_SIGMA * gaussian(&app->brush_rng);
+        pts[(n + i) * 2 + 1] = world.y + BRUSH_SIGMA * gaussian(&app->brush_rng);
+    }
+    app->ds.n = n + BRUSH_POINTS;
+    view_set_dataset(&app->view, &app->ds, app->gen.seed, true);
+    snprintf(app->message, sizeof app->message, "%zu points", app->ds.n);
+}
+
+/* Brush painting and centroid dragging on the canvas. */
+static void canvas_input(App *app)
+{
+    View *v = &app->view;
+    Vector2 m = GetMousePosition();
+    bool inside = CheckCollisionPointRec(m, v->canvas);
+    if (app->brush)
+    {
+        if (inside && IsMouseButtonDown(MOUSE_BUTTON_LEFT))
+            brush_paint(app, view_to_world(v, m));
+        return;
+    }
+    bool have = app->shown < app->frames.count && app->ds.dim == 2;
+    if (inside && have && IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
+    {
+        const float *c = app->frames.items[app->shown].centroids;
+        for (size_t j = 0; j < app->run_k; j++)
+        {
+            Vector2 s = view_to_screen(v, c[2 * j], c[2 * j + 1]);
+            if (Vector2Distance(s, m) <= 10.0f)
+            {
+                app->dragging = (int)j;
+                app->timeline.playing = false;
+                break;
+            }
+        }
+    }
+    if (app->dragging >= 0)
+    {
+        Vector2 w = view_to_world(v, m);
+        v->drag_active = true;
+        v->drag_idx = (size_t)app->dragging;
+        v->drag_xy[0] = w.x;
+        v->drag_xy[1] = w.y;
+        if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT))
+        {
+            float init[K_MAX * 2];
+            memcpy(init, app->frames.items[app->shown].centroids, app->run_k * 2 * sizeof(float));
+            init[2 * app->dragging] = w.x;
+            init[2 * app->dragging + 1] = w.y;
+            v->drag_active = false;
+            app->dragging = -1;
+            app_run(app, init);
+        }
+    }
 }
 
 int main(int argc, char **argv)
@@ -317,6 +431,8 @@ int main(int argc, char **argv)
     app.cfg.seed = o.gen.seed;
     app.trails = o.trails;
     app.voronoi = o.voronoi;
+    app.dragging = -1;
+    app.brush_rng = o.gen.seed;
     view_init_gl(&app.view);
     panel_init(&app.panel);
     timeline_init(&app.timeline);
@@ -333,7 +449,7 @@ int main(int argc, char **argv)
     else
         err = km_dataset_generate(&app.ds, &app.gen);
     if (err == KM_OK)
-        err = view_set_dataset(&app.view, &app.ds, app.gen.seed);
+        err = view_set_dataset(&app.view, &app.ds, app.gen.seed, false);
     if (err != KM_OK)
     {
         fprintf(stderr, "kmeans-gui: %s\n", km_strerror(err));
@@ -361,6 +477,8 @@ int main(int argc, char **argv)
         float cw = (float)(GetScreenWidth() - PANEL_W);
         float ch = (float)(GetScreenHeight() - TIMELINE_H - STATS_H);
         view_layout(&app.view, (Rectangle){PANEL_W, 0, cw, ch});
+
+        canvas_input(&app);
 
         char line[160];
         if (app.message[0])
@@ -410,6 +528,16 @@ int main(int argc, char **argv)
             app_generate(&app);
         else if (act == PANEL_RUN)
             app_run(&app, NULL);
+        else if (act == PANEL_CLEAR)
+            app_clear(&app);
+
+        if (IsFileDropped())
+        {
+            FilePathList files = LoadDroppedFiles();
+            if (files.count > 0 && IsFileExtension(files.paths[0], ".csv"))
+                app_load_csv(&app, files.paths[0]);
+            UnloadDroppedFiles(files);
+        }
 
         if (o.screenshot && app.info.status != RUN_RUNNING && ++settled >= 5)
         {

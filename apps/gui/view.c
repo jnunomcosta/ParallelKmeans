@@ -62,7 +62,7 @@ void view_free(View *v)
     *v = (View){0};
 }
 
-int view_set_dataset(View *v, const km_dataset *ds, uint64_t seed)
+int view_set_dataset(View *v, const km_dataset *ds, uint64_t seed, bool keep_bounds)
 {
     free(v->idx);
     free(v->labels);
@@ -73,7 +73,15 @@ int view_set_dataset(View *v, const km_dataset *ds, uint64_t seed)
     v->labels_valid = false;
     size_t n = ds->n;
     if (n == 0)
+    {
+        if (!v->bounds_set)
+        {
+            v->wmin[0] = v->wmin[1] = -5.0f;
+            v->wmax[0] = v->wmax[1] = 5.0f;
+            v->bounds_set = true;
+        }
         return KM_OK;
+    }
 
     size_t nd = n > DRAW_MAX ? DRAW_MAX : n;
     v->idx = malloc(nd * sizeof *v->idx);
@@ -105,6 +113,9 @@ int view_set_dataset(View *v, const km_dataset *ds, uint64_t seed)
     }
     v->nd = nd;
 
+    if (keep_bounds && v->bounds_set)
+        return KM_OK;
+    v->bounds_set = true;
     size_t yd = ycol(ds);
     v->wmin[0] = v->wmax[0] = ds->points[v->idx[0] * ds->dim];
     v->wmin[1] = v->wmax[1] = ds->points[v->idx[0] * ds->dim + yd];
@@ -147,6 +158,11 @@ void view_layout(View *v, Rectangle canvas)
 Vector2 view_to_screen(const View *v, float x, float y)
 {
     return (Vector2){v->origin.x + x * v->scale, v->origin.y - y * v->scale};
+}
+
+Vector2 view_to_world(const View *v, Vector2 s)
+{
+    return (Vector2){(s.x - v->origin.x) / v->scale, (v->origin.y - s.y) / v->scale};
 }
 
 /* Same arithmetic as the library's nearest-centroid search, so frame labels match exactly. */
@@ -263,6 +279,8 @@ void view_draw(View *v, const FrameList *frames, size_t shown, size_t k, bool tr
         for (size_t j = 0; j < k; j++)
         {
             Vector2 s = view_to_screen(v, cent[j * dim], cent[j * dim + yd]);
+            if (v->drag_active && v->drag_idx == j)
+                s = view_to_screen(v, v->drag_xy[0], v->drag_xy[1]);
             DrawCircleV(s, 6.5f, WHITE);
             DrawCircleV(s, 4.5f, palette_color((int)j));
         }

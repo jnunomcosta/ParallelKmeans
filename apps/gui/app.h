@@ -32,7 +32,9 @@ typedef struct App
     size_t shown; /* index of the displayed frame */
     Timeline timeline;
     bool autoplay; /* start playing from frame 0 on every run */
-    bool trails, voronoi;
+    bool trails, voronoi, brush;
+    int dragging; /* index of the centroid being dragged, or -1 */
+    uint64_t brush_rng;
     PanelState panel;
     DataSource source;
     char csv_path[1024];
