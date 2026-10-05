@@ -45,4 +45,15 @@ if(TARGET kmeans_cli)
     km_cli_exit_test(cli_err_k_zero 2 run --k 0)
     km_cli_exit_test(cli_err_impl_gpu 2 run --impl gpu)
     km_cli_exit_test(cli_err_input_and_dataset 2 run --input x.csv --dataset blobs)
+
+    set(KM_BENCH_CSV ${CMAKE_CURRENT_BINARY_DIR}/b.csv)
+    add_test(NAME cli_bench COMMAND ${KM_CLI} bench --n 2e4 --k 4 --threads 1,2 --repeat 1
+                                        --warmup 0 --iters 3 --csv ${KM_BENCH_CSV})
+    set_tests_properties(cli_bench PROPERTIES FIXTURES_SETUP cli_bench_csv)
+    add_test(NAME cli_bench_csv_header
+             COMMAND ${CMAKE_COMMAND} -DCSV=${KM_BENCH_CSV} -P ${CMAKE_CURRENT_SOURCE_DIR}/cli_bench_header.cmake)
+    set_tests_properties(cli_bench_csv_header PROPERTIES FIXTURES_REQUIRED cli_bench_csv)
+    add_test(NAME cli_bench_weak COMMAND ${KM_CLI} bench --scaling weak --n 1e4 --k 4 --threads 1,2
+                                             --repeat 1 --warmup 0 --iters 3)
+    km_cli_exit_test(cli_err_bench_threads 2 bench --threads 1,,2)
 endif()
