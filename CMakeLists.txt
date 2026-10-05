@@ -8,6 +8,9 @@ set(CMAKE_C_EXTENSIONS OFF)
 option(KMEANS_NATIVE "Add -march=native in Release builds" ON)
 option(KMEANS_WERROR "Treat warnings as errors" OFF)
 option(KMEANS_GUI "Build the raylib GUI" OFF)
+# Sanitizers for our targets, e.g. "address,undefined". ThreadSanitizer is not supported:
+# GCC's libgomp is not TSan-instrumented and produces false positives.
+set(KMEANS_SANITIZE "" CACHE STRING "Value for -fsanitize= (empty: off)")
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
@@ -21,6 +24,12 @@ add_library(kmeans_warnings INTERFACE)
 target_compile_options(kmeans_warnings INTERFACE -Wall -Wextra -Wpedantic -Wshadow)
 if(KMEANS_WERROR)
     target_compile_options(kmeans_warnings INTERFACE -Werror)
+endif()
+
+if(KMEANS_SANITIZE)
+    target_compile_options(kmeans_warnings INTERFACE
+        -fsanitize=${KMEANS_SANITIZE} -fno-omit-frame-pointer)
+    target_link_options(kmeans_warnings INTERFACE -fsanitize=${KMEANS_SANITIZE})
 endif()
 
 enable_testing()

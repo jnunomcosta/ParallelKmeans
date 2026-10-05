@@ -18,6 +18,23 @@
             "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
         },
         {
+            "name": "asan",
+            "inherits": "base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "KMEANS_SANITIZE": "address,undefined"
+            }
+        },
+        {
+            "name": "ci",
+            "inherits": "base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "KMEANS_NATIVE": "OFF",
+                "KMEANS_WERROR": "ON"
+            }
+        },
+        {
             "name": "gui",
             "inherits": "base",
             "cacheVariables": { "CMAKE_BUILD_TYPE": "Release", "KMEANS_GUI": "ON" }
@@ -26,6 +43,8 @@
     "buildPresets": [
         { "name": "debug", "configurePreset": "debug" },
         { "name": "release", "configurePreset": "release" },
+        { "name": "asan", "configurePreset": "asan" },
+        { "name": "ci", "configurePreset": "ci" },
         { "name": "gui", "configurePreset": "gui" }
     ],
     "testPresets": [
@@ -37,6 +56,20 @@
         {
             "name": "release",
             "configurePreset": "release",
+            "output": { "outputOnFailure": true }
+        },
+        {
+            "name": "asan",
+            "configurePreset": "asan",
+            "output": { "outputOnFailure": true },
+            "environment": {
+                "ASAN_OPTIONS": "detect_leaks=1",
+                "UBSAN_OPTIONS": "print_stacktrace=1:halt_on_error=1"
+            }
+        },
+        {
+            "name": "ci",
+            "configurePreset": "ci",
             "output": { "outputOnFailure": true }
         },
         {
