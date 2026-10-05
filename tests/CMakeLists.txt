@@ -8,3 +8,4 @@ km_add_test(test_dataset)
 
 km_add_test(test_csv)
 target_compile_definitions(test_csv PRIVATE TEST_TMP_DIR="${CMAKE_CURRENT_BINARY_DIR}")
+km_add_test(test_kmeans)
