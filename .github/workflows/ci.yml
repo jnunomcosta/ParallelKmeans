@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        cc: [gcc, clang]
+    env:
+      CC: ${{ matrix.cc }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install OpenMP for clang
+        if: matrix.cc == 'clang'
+        run: sudo apt-get install -y libomp-dev
+      - name: Configure
+        run: cmake --preset ci
+      - name: Build
+        run: cmake --build --preset ci -j
+      - name: Test
+        run: ctest --preset ci
+      - name: Smoke benchmark
+        run: build/ci/apps/cli/kmeans bench --n 1e5 --k 4 --threads 1,2 --repeat 1 --warmup 0 --iters 5
+
+  sanitize:
+    runs-on: ubuntu-latest
+    env:
+      CC: gcc
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake --preset asan
+      - run: cmake --build --preset asan -j
+      - run: ctest --preset asan
+
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install -r requirements-dev.txt
+      - run: git ls-files '*.c' '*.h' | xargs clang-format --dry-run --Werror
+
+  gui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install X11 and GL headers
+        run: >
+          sudo apt-get install -y libx11-dev libxrandr-dev libxinerama-dev
+          libxcursor-dev libxi-dev libgl1-mesa-dev
+      - name: Cache raylib and raygui sources
+        uses: actions/cache@v4
+        with:
+          path: build/gui/_deps
+          key: gui-deps-${{ hashFiles('apps/gui/CMakeLists.txt') }}
+      - run: cmake --preset gui
+      - run: cmake --build --preset gui -j
