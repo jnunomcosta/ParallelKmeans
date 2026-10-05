@@ -1,5 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
 
+#include "app.h"
 #include "kmeans/kmeans.h"
 
 #include <raylib.h>
@@ -248,20 +249,52 @@ int main(int argc, char **argv)
     SetWindowMinSize(960, 600);
     SetExitKey(KEY_NULL);
     SetTargetFPS(60);
+    int status = 0;
+
+    App app = {0};
+    app.gen = o.gen;
+    app.cfg = km_config_default();
+    app.cfg.k = o.k;
+    app.cfg.impl = o.impl;
+    app.cfg.threads = o.threads;
+    app.cfg.seed = o.gen.seed;
+    runner_init(&app.runner);
+
+    int err =
+        o.input ? km_dataset_load_csv(&app.ds, o.input) : km_dataset_generate(&app.ds, &app.gen);
+    if (err == KM_OK)
+        err = runner_start(&app.runner, &app.ds, &app.cfg);
+    if (err != KM_OK)
+    {
+        fprintf(stderr, "kmeans-gui: %s\n", km_strerror(err));
+        status = 1;
+    }
 
     const Color bg = {24, 26, 30, 255};
-    int frames = 0;
-    int status = 0;
-    while (!WindowShouldClose())
+    int settled = 0;
+    while (status == 0 && !WindowShouldClose())
     {
+        runner_poll(&app.runner, &app.frames);
+        app.info = runner_info(&app.runner);
+
+        char line[160];
+        if (app.info.status == RUN_RUNNING)
+            snprintf(line, sizeof line, "running... iter %u", app.info.iterations);
+        else if (app.info.status == RUN_DONE)
+            snprintf(line, sizeof line, "done in %u iters", app.info.iterations);
+        else if (app.info.status == RUN_CANCELLED)
+            snprintf(line, sizeof line, "cancelled after %u iters", app.info.iterations);
+        else
+            snprintf(line, sizeof line, "error: %s", km_strerror(app.info.err));
+
         BeginDrawing();
         ClearBackground(bg);
         DrawText("ParallelKmeans", 24, 24, 32, RAYWHITE);
         DrawText("K-Means visualizer", 24, 64, 20, GRAY);
+        DrawText(line, 24, 100, 20, RAYWHITE);
         EndDrawing();
-        frames++;
 
-        if (o.screenshot && frames >= 5)
+        if (o.screenshot && app.info.status != RUN_RUNNING && ++settled >= 5)
         {
             Image img = LoadImageFromScreen();
             if (!ExportImage(img, o.screenshot))
@@ -273,6 +306,9 @@ int main(int argc, char **argv)
             break;
         }
     }
+    runner_free(&app.runner);
+    framelist_free(&app.frames);
+    km_dataset_free(&app.ds);
     CloseWindow();
     return status;
 }
