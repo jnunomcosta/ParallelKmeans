@@ -11,3 +11,5 @@ target_compile_definitions(test_csv PRIVATE TEST_TMP_DIR="${CMAKE_CURRENT_BINARY
 km_add_test(test_kmeans)
 km_add_test(test_init)
 target_include_directories(test_init PRIVATE ${PROJECT_SOURCE_DIR}/src)
+
+km_add_test(test_parallel)

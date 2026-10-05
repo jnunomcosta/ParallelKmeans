@@ -85,16 +85,10 @@ static double now_seconds(void)
 }
 
 static double assign(const km_config *cfg, const km_dataset *ds, const float *centroids,
-                     int32_t *labels, double *sums, int64_t *counts)
+                     int32_t *labels, double *sums, int64_t *counts, km_omp_ws *ws)
 {
-    switch (cfg->impl)
-    {
-    case KM_IMPL_SEQ:
-        break;
-    case KM_IMPL_OMP:
-        /* TODO(spec 03) */
-        break;
-    }
+    if (cfg->impl == KM_IMPL_OMP)
+        return km_assign_omp(ds, centroids, cfg->k, labels, sums, counts, ws);
     return km_assign_seq(ds, centroids, cfg->k, labels, sums, counts);
 }
 
@@ -114,11 +108,14 @@ int km_run(const km_dataset *ds, const km_config *cfg, km_step_fn on_step, void 
     int32_t *labels = malloc(n * sizeof(int32_t));
     double *sums = malloc(k * dim * sizeof(double));
     int64_t *counts = malloc(k * sizeof(int64_t));
+    km_omp_ws ws = {0};
     int err = KM_OK;
     if (!cur || !next || !labels || !sums || !counts)
         err = KM_ERR_NOMEM;
     if (err == KM_OK)
         err = km_init_centroids(ds, cfg, cur);
+    if (err == KM_OK && cfg->impl == KM_IMPL_OMP)
+        err = km_omp_ws_init(&ws, cfg->threads > 0 ? cfg->threads : km_max_threads(), k, dim);
 
     double total = 0.0, inertia = 0.0;
     unsigned it = 0;
@@ -126,7 +123,7 @@ int km_run(const km_dataset *ds, const km_config *cfg, km_step_fn on_step, void 
     while (err == KM_OK && it < cfg->max_iter)
     {
         double t0 = now_seconds();
-        inertia = assign(cfg, ds, cur, labels, sums, counts);
+        inertia = assign(cfg, ds, cur, labels, sums, counts, &ws);
         double shift2 = 0.0;
         for (size_t j = 0; j < k; j++)
         {
@@ -165,6 +162,7 @@ int km_run(const km_dataset *ds, const km_config *cfg, km_step_fn on_step, void 
             break;
     }
 
+    km_omp_ws_free(&ws);
     free(next);
     free(sums);
     free(counts);

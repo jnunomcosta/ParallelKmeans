@@ -31,6 +31,21 @@ static inline int32_t km_nearest(const float *p, const float *c, size_t k, size_
 double km_assign_seq(const km_dataset *ds, const float *centroids, size_t k, int32_t *labels,
                      double *sums, int64_t *counts);
 
+/* Per-thread accumulation buffers: threads blocks of `stride` bytes, each holding
+ * double sums[k*dim] followed by int64_t counts[k]. */
+typedef struct km_omp_ws
+{
+    int threads;        /* team size the buffers were sized for */
+    size_t stride;      /* bytes per thread block, multiple of 64 */
+    unsigned char *mem; /* threads * stride bytes, 64-byte aligned */
+} km_omp_ws;
+int km_omp_ws_init(km_omp_ws *ws, int threads, size_t k, size_t dim);
+void km_omp_ws_free(km_omp_ws *ws);
+
+/* Same contract as km_assign_seq, in parallel. Deterministic for a fixed team size. */
+double km_assign_omp(const km_dataset *ds, const float *centroids, size_t k, int32_t *labels,
+                     double *sums, int64_t *counts, km_omp_ws *ws);
+
 /* Fills out[k*dim] with the starting centroids chosen by cfg->init. */
 int km_init_centroids(const km_dataset *ds, const km_config *cfg, float *out);
 
