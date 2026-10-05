@@ -32,7 +32,7 @@ typedef struct App
     size_t shown; /* index of the displayed frame */
     Timeline timeline;
     bool autoplay; /* start playing from frame 0 on every run */
-    bool trails;
+    bool trails, voronoi;
     PanelState panel;
     DataSource source;
     char csv_path[1024];

@@ -166,7 +166,8 @@ PanelAction panel_draw(App *app, Rectangle area)
         action = PANEL_RUN;
 
     Rectangle t = next_row(&c);
-    GuiCheckBox((Rectangle){t.x, t.y + 4, 16, 16}, "Trails (T)", &app->trails);
+    GuiCheckBox((Rectangle){t.x, t.y + 4, 16, 16}, "Voronoi (V)", &app->voronoi);
+    GuiCheckBox((Rectangle){t.x + 130, t.y + 4, 16, 16}, "Trails (T)", &app->trails);
 
     GuiUnlock();
 

@@ -316,6 +316,8 @@ int main(int argc, char **argv)
     app.cfg.threads = o.threads;
     app.cfg.seed = o.gen.seed;
     app.trails = o.trails;
+    app.voronoi = o.voronoi;
+    view_init_gl(&app.view);
     panel_init(&app.panel);
     timeline_init(&app.timeline);
     app.autoplay = !o.screenshot;
@@ -377,7 +379,7 @@ int main(int argc, char **argv)
         DrawRectangle(0, 0, PANEL_W, GetScreenHeight(), (Color){32, 35, 40, 255});
         DrawText("ParallelKmeans", 16, 16, 20, RAYWHITE);
         DrawText(line, 16, 48, 16, LIGHTGRAY);
-        view_draw(&app.view, &app.frames, app.shown, app.run_k, app.trails);
+        view_draw(&app.view, &app.frames, app.shown, app.run_k, app.trails, app.voronoi);
         timeline_draw(&app.timeline, &app.shown, app.frames.count,
                       (Rectangle){PANEL_W, ch, cw, TIMELINE_H});
         PanelAction act = panel_draw(&app, (Rectangle){0, 0, PANEL_W, (float)GetScreenHeight()});
@@ -389,6 +391,8 @@ int main(int argc, char **argv)
                 act = PANEL_GENERATE;
             if (IsKeyPressed(KEY_R))
                 act = PANEL_RUN;
+            if (IsKeyPressed(KEY_V))
+                app.voronoi = !app.voronoi;
             if (IsKeyPressed(KEY_T))
                 app.trails = !app.trails;
             timeline_keys(&app.timeline, &app.shown, app.frames.count);

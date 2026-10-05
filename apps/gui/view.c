@@ -15,13 +15,48 @@ static uint64_t splitmix64(uint64_t *x)
     return z ^ (z >> 31);
 }
 
+static const char *VORONOI_FS = "#version 330\n"
+                                "out vec4 finalColor;\n"
+                                "uniform vec2 centroids[32];\n"
+                                "uniform vec3 colors[32];\n"
+                                "uniform int count;\n"
+                                "uniform float alpha;\n"
+                                "void main()\n"
+                                "{\n"
+                                "    vec2 p = gl_FragCoord.xy;\n"
+                                "    float d1 = 1e20, d2 = 1e20;\n"
+                                "    int best = 0;\n"
+                                "    for (int i = 0; i < count; i++)\n"
+                                "    {\n"
+                                "        float d = distance(p, centroids[i]);\n"
+                                "        if (d < d1) { d2 = d1; d1 = d; best = i; }\n"
+                                "        else if (d < d2) { d2 = d; }\n"
+                                "    }\n"
+                                "    if (d2 - d1 < 1.0)\n"
+                                "        finalColor = vec4(colors[best] * 0.4, 0.6);\n"
+                                "    else\n"
+                                "        finalColor = vec4(colors[best], alpha);\n"
+                                "}\n";
+
 static size_t ycol(const km_dataset *ds)
 {
     return ds->dim > 1 ? 1 : 0;
 }
 
+void view_init_gl(View *v)
+{
+    v->voronoi = LoadShaderFromMemory(NULL, VORONOI_FS);
+    v->voronoi_ok = IsShaderValid(v->voronoi);
+    v->loc_centroids = GetShaderLocation(v->voronoi, "centroids");
+    v->loc_colors = GetShaderLocation(v->voronoi, "colors");
+    v->loc_count = GetShaderLocation(v->voronoi, "count");
+    v->loc_alpha = GetShaderLocation(v->voronoi, "alpha");
+}
+
 void view_free(View *v)
 {
+    if (v->voronoi_ok)
+        UnloadShader(v->voronoi);
     free(v->idx);
     free(v->labels);
     *v = (View){0};
@@ -45,7 +80,10 @@ int view_set_dataset(View *v, const km_dataset *ds, uint64_t seed)
     v->labels = malloc(nd * sizeof *v->labels);
     if (!v->idx || !v->labels)
     {
-        view_free(v);
+        free(v->idx);
+        free(v->labels);
+        v->idx = NULL;
+        v->labels = NULL;
         return KM_ERR_NOMEM;
     }
     if (nd == n)
@@ -152,7 +190,7 @@ static int point_size(size_t nd)
     return nd <= 5000 ? 3 : nd <= 50000 ? 2 : 1;
 }
 
-void view_draw(View *v, const FrameList *frames, size_t shown, size_t k, bool trails)
+void view_draw(View *v, const FrameList *frames, size_t shown, size_t k, bool trails, bool voronoi)
 {
     const km_dataset *ds = v->ds;
     if (!ds || ds->n == 0)
@@ -171,6 +209,30 @@ void view_draw(View *v, const FrameList *frames, size_t shown, size_t k, bool tr
 
     BeginScissorMode((int)v->canvas.x, (int)v->canvas.y, (int)v->canvas.width,
                      (int)v->canvas.height);
+    if (voronoi && have && v->voronoi_ok && dim == 2 && k <= K_MAX)
+    {
+        float cs[K_MAX * 2], col[K_MAX * 3];
+        float height = (float)GetRenderHeight();
+        for (size_t j = 0; j < k; j++)
+        {
+            Vector2 s = view_to_screen(v, cent[j * dim], cent[j * dim + yd]);
+            cs[2 * j] = s.x;
+            cs[2 * j + 1] = height - s.y; /* gl_FragCoord has its origin at the bottom */
+            Color pc = palette_color((int)j);
+            col[3 * j] = pc.r / 255.0f;
+            col[3 * j + 1] = pc.g / 255.0f;
+            col[3 * j + 2] = pc.b / 255.0f;
+        }
+        int count = (int)k;
+        float alpha = 0.15f;
+        SetShaderValueV(v->voronoi, v->loc_centroids, cs, SHADER_UNIFORM_VEC2, count);
+        SetShaderValueV(v->voronoi, v->loc_colors, col, SHADER_UNIFORM_VEC3, count);
+        SetShaderValue(v->voronoi, v->loc_count, &count, SHADER_UNIFORM_INT);
+        SetShaderValue(v->voronoi, v->loc_alpha, &alpha, SHADER_UNIFORM_FLOAT);
+        BeginShaderMode(v->voronoi);
+        DrawRectangleRec(v->canvas, WHITE);
+        EndShaderMode();
+    }
     int ps = point_size(v->nd);
     for (size_t i = 0; i < v->nd; i++)
     {
