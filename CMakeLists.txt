@@ -27,7 +27,7 @@ enable_testing()
 
 add_subdirectory(src)
 add_subdirectory(apps/cli)
-if(KMEANS_GUI AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/apps/gui/CMakeLists.txt")
+if(KMEANS_GUI)
     add_subdirectory(apps/gui)
 endif()
 add_subdirectory(tests)

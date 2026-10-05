@@ -16,11 +16,17 @@
             "name": "release",
             "inherits": "base",
             "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+        },
+        {
+            "name": "gui",
+            "inherits": "base",
+            "cacheVariables": { "CMAKE_BUILD_TYPE": "Release", "KMEANS_GUI": "ON" }
         }
     ],
     "buildPresets": [
         { "name": "debug", "configurePreset": "debug" },
-        { "name": "release", "configurePreset": "release" }
+        { "name": "release", "configurePreset": "release" },
+        { "name": "gui", "configurePreset": "gui" }
     ],
     "testPresets": [
         {
@@ -31,6 +37,11 @@
         {
             "name": "release",
             "configurePreset": "release",
+            "output": { "outputOnFailure": true }
+        },
+        {
+            "name": "gui",
+            "configurePreset": "gui",
             "output": { "outputOnFailure": true }
         }
     ]
