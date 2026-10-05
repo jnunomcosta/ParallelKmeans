@@ -17,7 +17,13 @@ FetchContent_MakeAvailable(raygui)
 
 find_package(Threads REQUIRED)
 
-add_executable(kmeans_gui main.c runner.c view.c palette.c)
+# raygui produces warnings, so its implementation is built without our warning flags.
+add_library(raygui_impl STATIC raygui_impl.c)
+target_include_directories(raygui_impl SYSTEM PUBLIC ${raygui_SOURCE_DIR}/src)
+target_link_libraries(raygui_impl PUBLIC raylib)
+target_compile_options(raygui_impl PRIVATE -w)
+
+add_executable(kmeans_gui main.c runner.c view.c palette.c panel.c)
 set_target_properties(kmeans_gui PROPERTIES OUTPUT_NAME kmeans-gui)
-target_link_libraries(kmeans_gui PRIVATE kmeans::kmeans raylib Threads::Threads m)
+target_link_libraries(kmeans_gui PRIVATE kmeans::kmeans raygui_impl raylib Threads::Threads m)
 target_link_libraries(kmeans_gui PRIVATE kmeans_warnings)

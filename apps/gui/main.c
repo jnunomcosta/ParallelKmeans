@@ -2,6 +2,8 @@
 
 #include "app.h"
 #include "kmeans/kmeans.h"
+#include "panel.h"
+#include "view.h"
 
 #include <raylib.h>
 
@@ -224,6 +226,58 @@ static int parse_args(int argc, char **argv, Options *o)
     return 0;
 }
 
+static void app_message(App *app, const char *what, int err)
+{
+    snprintf(app->message, sizeof app->message, "%s: %s", what, km_strerror(err));
+}
+
+static void app_run(App *app, const float *given)
+{
+    km_config cfg = app->cfg;
+    if (cfg.k > app->ds.n)
+    {
+        snprintf(app->message, sizeof app->message, "k must not exceed n");
+        return;
+    }
+    if (given)
+    {
+        cfg.init = KM_INIT_GIVEN;
+        cfg.initial_centroids = given;
+    }
+    framelist_clear(&app->frames);
+    view_invalidate(&app->view);
+    app->shown = 0;
+    app->run_k = cfg.k;
+    app->message[0] = '\0';
+    int err = runner_start(&app->runner, &app->ds, &cfg);
+    if (err != KM_OK)
+        app_message(app, "run", err);
+}
+
+/* New data from the current source, then a run on it. */
+static void app_generate(App *app)
+{
+    km_dataset ds = {0};
+    int err = app->source == SRC_CSV ? km_dataset_load_csv(&ds, app->csv_path)
+                                     : km_dataset_generate(&ds, &app->gen);
+    if (err != KM_OK)
+    {
+        app_message(app, "generate", err);
+        return;
+    }
+    runner_cancel(&app->runner);
+    runner_join(&app->runner);
+    km_dataset_free(&app->ds);
+    app->ds = ds;
+    err = view_set_dataset(&app->view, &app->ds, app->gen.seed);
+    if (err != KM_OK)
+    {
+        app_message(app, "view", err);
+        return;
+    }
+    app_run(app, NULL);
+}
+
 int main(int argc, char **argv)
 {
     Options o = {0};
@@ -249,6 +303,7 @@ int main(int argc, char **argv)
     SetWindowMinSize(960, 600);
     SetExitKey(KEY_NULL);
     SetTargetFPS(60);
+    panel_theme();
     int status = 0;
 
     App app = {0};
@@ -259,23 +314,32 @@ int main(int argc, char **argv)
     app.cfg.threads = o.threads;
     app.cfg.seed = o.gen.seed;
     app.trails = o.trails;
+    panel_init(&app.panel);
     runner_init(&app.runner);
 
-    int err =
-        o.input ? km_dataset_load_csv(&app.ds, o.input) : km_dataset_generate(&app.ds, &app.gen);
+    int err = KM_OK;
+    if (o.input)
+    {
+        app.source = SRC_CSV;
+        snprintf(app.csv_path, sizeof app.csv_path, "%s", o.input);
+        err = km_dataset_load_csv(&app.ds, o.input);
+    }
+    else
+        err = km_dataset_generate(&app.ds, &app.gen);
     if (err == KM_OK)
         err = view_set_dataset(&app.view, &app.ds, app.gen.seed);
-    if (err == KM_OK)
-        err = runner_start(&app.runner, &app.ds, &app.cfg);
     if (err != KM_OK)
     {
         fprintf(stderr, "kmeans-gui: %s\n", km_strerror(err));
         status = 1;
     }
+    else
+        app_run(&app, NULL);
 
     const Color bg = {24, 26, 30, 255};
     int settled = 0;
-    while (status == 0 && !WindowShouldClose())
+    bool quit = false;
+    while (status == 0 && !quit)
     {
         runner_poll(&app.runner, &app.frames);
         app.info = runner_info(&app.runner);
@@ -285,7 +349,9 @@ int main(int argc, char **argv)
                                            (float)(GetScreenHeight() - TIMELINE_H - STATS_H)});
 
         char line[160];
-        if (app.info.status == RUN_RUNNING)
+        if (app.message[0])
+            snprintf(line, sizeof line, "%s", app.message);
+        else if (app.info.status == RUN_RUNNING)
             snprintf(line, sizeof line, "running... iter %u", app.info.iterations);
         else if (app.info.status == RUN_DONE)
             snprintf(line, sizeof line, "done in %u iters", app.info.iterations);
@@ -299,8 +365,32 @@ int main(int argc, char **argv)
         DrawRectangle(0, 0, PANEL_W, GetScreenHeight(), (Color){32, 35, 40, 255});
         DrawText("ParallelKmeans", 16, 16, 20, RAYWHITE);
         DrawText(line, 16, 48, 16, LIGHTGRAY);
-        view_draw(&app.view, &app.frames, app.shown, app.cfg.k, app.trails);
+        view_draw(&app.view, &app.frames, app.shown, app.run_k, app.trails);
+        PanelAction act = panel_draw(&app, (Rectangle){0, 0, PANEL_W, (float)GetScreenHeight()});
         EndDrawing();
+
+        if (!app.panel.editing)
+        {
+            if (IsKeyPressed(KEY_G))
+                act = PANEL_GENERATE;
+            if (IsKeyPressed(KEY_R))
+                act = PANEL_RUN;
+            if (IsKeyPressed(KEY_T))
+                app.trails = !app.trails;
+        }
+        if (IsKeyPressed(KEY_ESCAPE))
+        {
+            if (app.info.status == RUN_RUNNING)
+                runner_cancel(&app.runner);
+            else
+                quit = true;
+        }
+        if (WindowShouldClose())
+            quit = true;
+        if (act == PANEL_GENERATE)
+            app_generate(&app);
+        else if (act == PANEL_RUN)
+            app_run(&app, NULL);
 
         if (o.screenshot && app.info.status != RUN_RUNNING && ++settled >= 5)
         {
