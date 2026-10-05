@@ -27,4 +27,12 @@ if(TARGET kmeans_cli)
     add_test(NAME cli_version COMMAND ${KM_CLI} --version)
     set_tests_properties(cli_version PROPERTIES PASS_REGULAR_EXPRESSION "^2\\.0\\.0")
     km_cli_exit_test(cli_unknown_command 2 frobnicate)
+
+    # gen writes a file that run can read back (run is added with the run subcommand).
+    add_test(NAME cli_gen COMMAND ${KM_CLI} gen --n 2e4 --seed 7 -o ${CMAKE_CURRENT_BINARY_DIR}/cli_gen.csv)
+    set_tests_properties(cli_gen PROPERTIES FIXTURES_SETUP cli_gen_csv PASS_REGULAR_EXPRESSION
+                                            "wrote 20000 points \\(dim 2\\)")
+    km_cli_exit_test(cli_err_n_fraction 2 gen --n 1.5 -o x.csv)
+    km_cli_exit_test(cli_err_dataset_enum 2 gen --dataset gpu -o x.csv)
+    km_cli_exit_test(cli_err_gen_no_output 2 gen)
 endif()
