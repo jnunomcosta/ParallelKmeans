@@ -4,6 +4,10 @@ K-Means clustering in C with a sequential baseline, an OpenMP parallel version, 
 
 ![K-Means on 20 000 points: clusters, Voronoi regions and the inertia plot](docs/img/blobs_final.png)
 
+[Try it in the browser](https://jnunomcosta.github.io/ParallelKmeans/kmeans-gui.html).
+The web demo is the GUI compiled to WebAssembly and runs on a single thread;
+the benchmarks in this repository are native.
+
 ## What this is
 
 This started as an assignment for an MSc Parallel Computing class: three
