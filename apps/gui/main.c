@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 
 #include "app.h"
+#include "image_mode.h"
 #include "kmeans/kmeans.h"
 #include "panel.h"
 #include "stats.h"
@@ -249,6 +250,7 @@ static void app_run(App *app, const float *given)
     }
     framelist_clear(&app->frames);
     view_invalidate(&app->view);
+    image_mode_invalidate(&app->img);
     app->shown = 0;
     app->timeline.playing = app->autoplay;
     app->timeline.acc = 0.0;
@@ -279,12 +281,30 @@ static void app_compare(App *app)
         app_message(app, "compare", err);
 }
 
+/* Builds a dataset from the current source. Image mode follows the source. */
+static int app_load_dataset(App *app, km_dataset *ds)
+{
+    int err;
+    switch (app->source)
+    {
+    case SRC_CSV:
+        err = km_dataset_load_csv(ds, app->source_path);
+        break;
+    case SRC_IMAGE:
+        return image_mode_load(&app->img, app->source_path, ds);
+    default:
+        err = km_dataset_generate(ds, &app->gen);
+    }
+    if (err == KM_OK)
+        image_mode_free(&app->img);
+    return err;
+}
+
 /* New data from the current source, then a run on it. */
 static void app_generate(App *app)
 {
     km_dataset ds = {0};
-    int err = app->source == SRC_CSV ? km_dataset_load_csv(&ds, app->csv_path)
-                                     : km_dataset_generate(&ds, &app->gen);
+    int err = app_load_dataset(app, &ds);
     if (err != KM_OK)
     {
         app_message(app, "generate", err);
@@ -309,6 +329,7 @@ static void app_stop(App *app)
     runner_join(&app->runner);
     framelist_clear(&app->frames);
     view_invalidate(&app->view);
+    image_mode_invalidate(&app->img);
     app->shown = 0;
 }
 
@@ -321,10 +342,10 @@ static void app_clear(App *app)
     snprintf(app->message, sizeof app->message, "no points: paint some with Brush");
 }
 
-static void app_load_csv(App *app, const char *path)
+static void app_load_file(App *app, const char *path, DataSource source)
 {
-    snprintf(app->csv_path, sizeof app->csv_path, "%s", path);
-    app->source = SRC_CSV;
+    snprintf(app->source_path, sizeof app->source_path, "%s", path);
+    app->source = source;
     app_generate(app);
 }
 
@@ -371,6 +392,8 @@ static void brush_paint(App *app, Vector2 world)
 /* Brush painting and centroid dragging on the canvas. */
 static void canvas_input(App *app)
 {
+    if (app->img.active)
+        return;
     View *v = &app->view;
     Vector2 m = GetMousePosition();
     bool inside = CheckCollisionPointRec(m, v->canvas);
@@ -460,15 +483,12 @@ int main(int argc, char **argv)
     app.autoplay = !o.screenshot;
     runner_init(&app.runner);
 
-    int err = KM_OK;
-    if (o.input)
+    if (o.input || o.image)
     {
-        app.source = SRC_CSV;
-        snprintf(app.csv_path, sizeof app.csv_path, "%s", o.input);
-        err = km_dataset_load_csv(&app.ds, o.input);
+        app.source = o.input ? SRC_CSV : SRC_IMAGE;
+        snprintf(app.source_path, sizeof app.source_path, "%s", o.input ? o.input : o.image);
     }
-    else
-        err = km_dataset_generate(&app.ds, &app.gen);
+    int err = app_load_dataset(&app, &app.ds);
     if (err == KM_OK)
         err = view_set_dataset(&app.view, &app.ds, app.gen.seed, false);
     if (err != KM_OK)
@@ -529,7 +549,11 @@ int main(int argc, char **argv)
         DrawRectangle(0, 0, PANEL_W, GetScreenHeight(), (Color){32, 35, 40, 255});
         DrawText("ParallelKmeans", 16, 16, 20, RAYWHITE);
         DrawText(line, 16, 48, 16, LIGHTGRAY);
-        view_draw(&app.view, &app.frames, app.shown, app.run_k, app.trails, app.voronoi);
+        if (app.img.active)
+            image_mode_draw(&app.img, &app.ds, &app.frames, app.shown, app.run_k,
+                            (Rectangle){PANEL_W, 0, cw, ch});
+        else
+            view_draw(&app.view, &app.frames, app.shown, app.run_k, app.trails, app.voronoi);
         timeline_draw(&app.timeline, &app.shown, app.frames.count,
                       (Rectangle){PANEL_W, ch, cw, TIMELINE_H});
         stats_draw(&app, (Rectangle){PANEL_W, ch + TIMELINE_H, cw, STATS_H});
@@ -542,9 +566,9 @@ int main(int argc, char **argv)
                 act = PANEL_GENERATE;
             if (IsKeyPressed(KEY_R))
                 act = PANEL_RUN;
-            if (IsKeyPressed(KEY_V))
+            if (IsKeyPressed(KEY_V) && !app.img.active)
                 app.voronoi = !app.voronoi;
-            if (IsKeyPressed(KEY_T))
+            if (IsKeyPressed(KEY_T) && !app.img.active)
                 app.trails = !app.trails;
             timeline_keys(&app.timeline, &app.shown, app.frames.count);
         }
@@ -570,7 +594,11 @@ int main(int argc, char **argv)
         {
             FilePathList files = LoadDroppedFiles();
             if (files.count > 0 && IsFileExtension(files.paths[0], ".csv"))
-                app_load_csv(&app, files.paths[0]);
+                app_load_file(&app, files.paths[0], SRC_CSV);
+            else if (files.count > 0 && (IsFileExtension(files.paths[0], ".png") ||
+                                         IsFileExtension(files.paths[0], ".jpg") ||
+                                         IsFileExtension(files.paths[0], ".jpeg")))
+                app_load_file(&app, files.paths[0], SRC_IMAGE);
             UnloadDroppedFiles(files);
         }
 
@@ -588,6 +616,7 @@ int main(int argc, char **argv)
     }
     runner_free(&app.runner);
     view_free(&app.view);
+    image_mode_free(&app.img);
     framelist_free(&app.frames);
     km_dataset_free(&app.ds);
     CloseWindow();

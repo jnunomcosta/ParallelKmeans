@@ -168,6 +168,8 @@ PanelAction panel_draw(App *app, Rectangle area)
     Rectangle cp = next_row(&c);
     if (GuiButton((Rectangle){cp.x, cp.y, bw, cp.height}, "Compare"))
         action = PANEL_COMPARE;
+    if (app->img.active)
+        GuiDisable();
     if (GuiButton((Rectangle){cp.x + bw + 4, cp.y, bw, cp.height}, "Clear points"))
         action = PANEL_CLEAR;
 
@@ -176,6 +178,8 @@ PanelAction panel_draw(App *app, Rectangle area)
     GuiCheckBox((Rectangle){t.x + 130, t.y + 4, 16, 16}, "Trails (T)", &app->trails);
     Rectangle t2 = next_row(&c);
     GuiCheckBox((Rectangle){t2.x, t2.y + 4, 16, 16}, "Brush", &app->brush);
+    if (app->img.active)
+        GuiEnable();
 
     GuiUnlock();
 
@@ -188,8 +192,10 @@ PanelAction panel_draw(App *app, Rectangle area)
         ps->dd_init = !ps->dd_init;
     app->cfg.init = ps->init_idx == 0 ? KM_INIT_RANDOM : KM_INIT_PLUSPLUS;
 
-    int ds = app->source == SRC_CSV ? 3 : (int)app->gen.kind;
-    const char *items = app->source == SRC_CSV ? "uniform;blobs;rings;csv" : "uniform;blobs;rings";
+    int ds = app->source == SRC_GEN ? (int)app->gen.kind : 3;
+    const char *items = app->source == SRC_CSV     ? "uniform;blobs;rings;csv"
+                        : app->source == SRC_IMAGE ? "uniform;blobs;rings;image"
+                                                   : "uniform;blobs;rings";
     if (GuiDropdownBox(r_dataset, items, &ds, ps->dd_dataset))
         ps->dd_dataset = !ps->dd_dataset;
     if (ds < 3) /* the csv entry only exists while a CSV is loaded, so this is a user pick */

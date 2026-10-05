@@ -1,6 +1,7 @@
 #ifndef KMEANS_GUI_APP_H
 #define KMEANS_GUI_APP_H
 
+#include "image_mode.h"
 #include "kmeans/kmeans.h"
 #include "panel.h"
 #include "runner.h"
@@ -16,7 +17,8 @@
 typedef enum
 {
     SRC_GEN,
-    SRC_CSV
+    SRC_CSV,
+    SRC_IMAGE
 } DataSource;
 
 /* All UI state. */
@@ -40,7 +42,8 @@ typedef struct App
     uint64_t brush_rng;
     PanelState panel;
     DataSource source;
-    char csv_path[1024];
+    char source_path[1024]; /* CSV or image file */
+    ImageMode img;
     char message[128]; /* last error, shown in the panel */
     size_t run_k;      /* k of the run whose frames are shown */
 } App;
