@@ -63,7 +63,7 @@ km_config km_config_default(void)
     c.max_iter = 300;
     c.tol = 1e-4;
     c.init = KM_INIT_PLUSPLUS;
-    c.seed = 69420;
+    c.seed = 1342756;
     c.impl = KM_IMPL_OMP;
     return c;
 }

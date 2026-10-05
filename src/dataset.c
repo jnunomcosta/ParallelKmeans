@@ -5,7 +5,7 @@
 
 km_gen_params km_gen_params_default(void)
 {
-    km_gen_params p = {KM_GEN_BLOBS, 100000, 2, 8, 0.5f, 69420};
+    km_gen_params p = {KM_GEN_BLOBS, 100000, 2, 8, 0.5f, 1342756};
     return p;
 }
 

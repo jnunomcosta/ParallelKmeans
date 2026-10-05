@@ -35,7 +35,7 @@ static void usage(FILE *f)
           "      --init INIT       random or kmeans++ (default: kmeans++)\n"
           "      --max-iter N      iteration limit (default: 300)\n"
           "      --tol X           stop when max centroid shift <= X (default: 1e-4)\n"
-          "      --seed S          generator and init seed (default: 69420)\n"
+          "      --seed S          generator and init seed (default: 1342756)\n"
           "\n"
           "Output:\n"
           "      --labels-out FILE     write one label per line\n"

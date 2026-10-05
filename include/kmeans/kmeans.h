@@ -38,7 +38,7 @@ typedef struct km_gen_params
     float spread;   /* blobs: stddev; rings: radial noise stddev */
     uint64_t seed;
 } km_gen_params;
-/* blobs, n=100000, dim=2, centers=8, spread=0.5, seed=69420 */
+/* blobs, n=100000, dim=2, centers=8, spread=0.5, seed=1342756 */
 km_gen_params km_gen_params_default(void);
 
 int km_dataset_alloc(km_dataset *ds, size_t n, size_t dim);
@@ -66,7 +66,7 @@ typedef struct km_config
     double tol;        /* converged when max centroid shift <= tol; < 0 disables. default 1e-4 */
     km_init init;      /* default KM_INIT_PLUSPLUS */
     const float *initial_centroids; /* k*dim floats, required iff init == KM_INIT_GIVEN */
-    uint64_t seed;                  /* default 69420 */
+    uint64_t seed;                  /* default 1342756 */
     km_impl impl;                   /* default KM_IMPL_OMP */
     int threads;                    /* omp only; 0 = OpenMP default */
 } km_config;

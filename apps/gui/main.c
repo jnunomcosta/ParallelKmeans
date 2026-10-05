@@ -66,7 +66,7 @@ static void usage(FILE *f)
           "  -k, --k K             number of clusters (default: 8)\n"
           "      --impl IMPL       seq or omp (default: omp)\n"
           "  -t, --threads T       omp threads, 0 = OpenMP default (default: 0)\n"
-          "      --seed S          generator and init seed (default: 69420)\n"
+          "      --seed S          generator and init seed (default: 1342756)\n"
           "  -i, --input FILE      load a CSV file\n"
           "      --image FILE      start in image mode\n"
           "      --screenshot FILE.png  render once and exit\n"

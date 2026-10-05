@@ -34,7 +34,7 @@ static void usage(FILE *f)
           "      --dim D           dimensions; rings needs 2 (default: 2)\n"
           "      --centers C       blobs or rings count (default: 8)\n"
           "      --spread S        blob stddev or ring noise (default: 0.5)\n"
-          "      --seed S          generator and init seed (default: 69420)\n"
+          "      --seed S          generator and init seed (default: 1342756)\n"
           "\n"
           "Benchmark:\n"
           "  -k, --k LIST          cluster counts (default: 8)\n"

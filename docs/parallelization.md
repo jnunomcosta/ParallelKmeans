@@ -25,7 +25,7 @@ iteration, and its points are independent of each other.
 
 The repository began as an assignment for an MSc Parallel Computing class. It
 had three C files, all on 2D points, all reading their parameters from `scanf`
-and using the fixed seed 69420.
+and using the fixed seed 1342756.
 
 - `ourKmeans.c` is the sequential version. It copies every point into a
   per-cluster buffer, then averages each buffer. It stops when no centroid
