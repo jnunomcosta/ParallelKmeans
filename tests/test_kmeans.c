@@ -111,6 +111,27 @@ static void test_k_equals_n(void)
     km_dataset_free(&ds);
 }
 
+static void test_empty_cluster(void)
+{
+    km_dataset ds = {0};
+    CHECK(km_dataset_alloc(&ds, 300, 2) == KM_OK);
+    float pts[6] = {0, 0, 1, 0, 0, 1};
+    for (size_t i = 0; i < ds.n; i++)
+        for (size_t d = 0; d < 2; d++)
+            ds.points[i * 2 + d] = pts[(i % 3) * 2 + d];
+    float init[8] = {0, 0, 1, 0, 0, 1, 1000, 1000};
+    km_config cfg = base_config(4);
+    cfg.init = KM_INIT_GIVEN;
+    cfg.initial_centroids = init;
+    km_result r = {0};
+    CHECK(km_run(&ds, &cfg, NULL, NULL, &r) == KM_OK);
+    CHECK(r.centroids[6] == 1000.0f && r.centroids[7] == 1000.0f);
+    for (size_t i = 0; i < 8; i++)
+        CHECK(!isnan(r.centroids[i]));
+    km_result_free(&r);
+    km_dataset_free(&ds);
+}
+
 static void test_invalid(void)
 {
     km_dataset ds = {0};
@@ -147,6 +168,7 @@ int main(void)
     test_max_iter();
     test_callback();
     test_k_equals_n();
+    test_empty_cluster();
     test_invalid();
     return TEST_MAIN();
 }
