@@ -42,5 +42,7 @@ km_gen_params km_gen_params_default(void);
 int km_dataset_alloc(km_dataset *ds, size_t n, size_t dim);
 void km_dataset_free(km_dataset *ds);
 int km_dataset_generate(km_dataset *ds, const km_gen_params *p);
+int km_dataset_load_csv(km_dataset *ds, const char *path);
+int km_dataset_save_csv(const km_dataset *ds, const char *path);
 
 #endif
