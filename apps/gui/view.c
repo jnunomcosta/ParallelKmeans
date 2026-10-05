@@ -325,12 +325,12 @@ void view_draw(View *v, const FrameList *frames, size_t shown, size_t k, bool tr
         fmt_count(a, sizeof a, v->nd);
         fmt_count(b, sizeof b, ds->n);
         snprintf(line, sizeof line, "drawing %s of %s points", a, b);
-        DrawText(line, (int)v->canvas.x + 12, (int)y, 14, LIGHTGRAY);
+        font_text(line, (int)v->canvas.x + 12, (int)y, 14, LIGHTGRAY);
         y -= 18;
     }
     if (dim > 2)
     {
         snprintf(line, sizeof line, "showing dims 0,1 of %zu", dim);
-        DrawText(line, (int)v->canvas.x + 12, (int)y, 14, LIGHTGRAY);
+        font_text(line, (int)v->canvas.x + 12, (int)y, 14, LIGHTGRAY);
     }
 }

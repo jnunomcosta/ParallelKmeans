@@ -1,6 +1,7 @@
 #ifndef KMEANS_GUI_APP_H
 #define KMEANS_GUI_APP_H
 
+#include "font.h"
 #include "image_mode.h"
 #include "kmeans/kmeans.h"
 #include "panel.h"

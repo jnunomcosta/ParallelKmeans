@@ -6,7 +6,7 @@
 
 static void text(const char *s, float x, float y, Color c)
 {
-    DrawText(s, (int)x, (int)y, 14, c);
+    font_text(s, (int)x, (int)y, 14, c);
 }
 
 static void draw_plot(const App *app, Rectangle r)

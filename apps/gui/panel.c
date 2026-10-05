@@ -132,7 +132,7 @@ PanelAction panel_draw(App *app, Rectangle area)
     GuiSlider(r_k, NULL, NULL, &kf, 2.0f, (float)K_MAX);
     app->cfg.k = (size_t)lroundf(kf);
     snprintf(buf, sizeof buf, "%zu", app->cfg.k);
-    DrawText(buf, (int)(r_k.x + r_k.width - 20), (int)r_k.y + 5, 14, WHITE);
+    font_text(buf, (int)(r_k.x + r_k.width - 20), (int)r_k.y + 5, 14, WHITE);
 
 #ifndef PLATFORM_WEB
     int impl = (int)app->cfg.impl;
@@ -149,7 +149,7 @@ PanelAction panel_draw(App *app, Rectangle area)
         GuiEnable();
     app->cfg.threads = (int)lroundf(tf);
     snprintf(buf, sizeof buf, "%d", app->cfg.threads);
-    DrawText(buf, (int)(r_threads.x + r_threads.width - 20), (int)r_threads.y + 5, 14, WHITE);
+    font_text(buf, (int)(r_threads.x + r_threads.width - 20), (int)r_threads.y + 5, 14, WHITE);
 #endif
 
     int seed = (int)(app->gen.seed & 0x7fffffff);
@@ -166,7 +166,7 @@ PanelAction panel_draw(App *app, Rectangle area)
     GuiSlider(r_speed, NULL, NULL, &fps, (float)TIMELINE_FPS_MIN, (float)TIMELINE_FPS_MAX);
     app->timeline.fps = (int)lroundf(fps);
     snprintf(buf, sizeof buf, "%d fps", app->timeline.fps);
-    DrawText(buf, (int)(r_speed.x + r_speed.width - 50), (int)r_speed.y + 5, 14, WHITE);
+    font_text(buf, (int)(r_speed.x + r_speed.width - 50), (int)r_speed.y + 5, 14, WHITE);
 
     Rectangle b = next_row(&c);
     float bw = b.width / 2 - 2;

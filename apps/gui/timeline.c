@@ -1,5 +1,6 @@
 #include "timeline.h"
 
+#include "font.h"
 #include "raygui.h"
 
 #include <stdio.h>
@@ -112,5 +113,5 @@ void timeline_draw(Timeline *t, size_t *shown, size_t count, Rectangle area)
         GuiEnable();
     char buf[48];
     snprintf(buf, sizeof buf, "frame %zu / %zu", has ? *shown : 0, has ? count - 1 : 0);
-    DrawText(buf, (int)(sx + sw + 10), (int)y + 6, 14, LIGHTGRAY);
+    font_text(buf, (int)(sx + sw + 10), (int)y + 6, 14, LIGHTGRAY);
 }

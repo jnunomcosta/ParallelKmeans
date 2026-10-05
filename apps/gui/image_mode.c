@@ -1,5 +1,7 @@
 #include "image_mode.h"
 
+#include "font.h"
+
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -135,10 +137,10 @@ void image_mode_draw(ImageMode *im, const km_dataset *ds, const FrameList *frame
     Rectangle right = {canvas.x + 2 * pad + half, left.y, half, ah};
     Rectangle l = fit(im->w, im->h, left), r = fit(im->w, im->h, right);
     Rectangle src = {0, 0, (float)im->w, (float)im->h};
-    DrawText("original", (int)left.x, (int)canvas.y + 12, 14, LIGHTGRAY);
+    font_text("original", (int)left.x, (int)canvas.y + 12, 14, LIGHTGRAY);
     DrawTexturePro(im->original, src, l, (Vector2){0, 0}, 0.0f, WHITE);
-    DrawText(have ? TextFormat("%zu colours, frame %zu", k, shown) : "quantized", (int)right.x,
-             (int)canvas.y + 12, 14, LIGHTGRAY);
+    font_text(have ? TextFormat("%zu colours, frame %zu", k, shown) : "quantized", (int)right.x,
+              (int)canvas.y + 12, 14, LIGHTGRAY);
     if (have)
         DrawTexturePro(im->quantized, src, r, (Vector2){0, 0}, 0.0f, WHITE);
     else

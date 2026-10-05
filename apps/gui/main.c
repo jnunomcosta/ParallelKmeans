@@ -500,8 +500,8 @@ static void frame(void)
     BeginDrawing();
     ClearBackground(bg);
     DrawRectangle(0, 0, PANEL_W, GetScreenHeight(), (Color){32, 35, 40, 255});
-    DrawText("ParallelKmeans", 16, 16, 20, RAYWHITE);
-    DrawText(line, 16, 48, 16, LIGHTGRAY);
+    font_text("ParallelKmeans", 16, 16, 20, RAYWHITE);
+    font_text(line, 16, 48, 16, LIGHTGRAY);
     if (app.img.active)
         image_mode_draw(&app.img, &app.ds, &app.frames, app.shown, app.run_k,
                         (Rectangle){PANEL_W, 0, cw, ch});
@@ -608,6 +608,7 @@ int main(int argc, char **argv)
 #ifndef PLATFORM_WEB
     SetTargetFPS(60);
 #endif
+    font_init();
     panel_theme();
     status = 0;
 
@@ -656,6 +657,7 @@ int main(int argc, char **argv)
     image_mode_free(&app.img);
     framelist_free(&app.frames);
     km_dataset_free(&app.ds);
+    font_free();
     CloseWindow();
     return status;
 }

@@ -31,18 +31,24 @@ target_include_directories(raygui_impl SYSTEM PUBLIC ${raygui_SOURCE_DIR}/src)
 target_link_libraries(raygui_impl PUBLIC raylib)
 target_compile_options(raygui_impl PRIVATE -w)
 
-add_executable(kmeans_gui main.c runner.c view.c palette.c panel.c timeline.c stats.c image_mode.c)
+add_executable(kmeans_gui main.c font.c runner.c view.c palette.c panel.c timeline.c stats.c image_mode.c)
 set_target_properties(kmeans_gui PROPERTIES OUTPUT_NAME kmeans-gui)
 target_link_libraries(kmeans_gui PRIVATE kmeans::kmeans raygui_impl raylib m)
 target_link_libraries(kmeans_gui PRIVATE kmeans_warnings)
 
 if(EMSCRIPTEN)
+    # The font is embedded in the wasm module and found at the root of its virtual file system.
+    target_compile_definitions(kmeans_gui PRIVATE KMEANS_GUI_FONT_FILE="/DejaVuSans.ttf")
     target_compile_options(kmeans_gui PRIVATE -Wno-unknown-pragmas)
     set_target_properties(kmeans_gui PROPERTIES SUFFIX ".html")
     target_link_options(kmeans_gui PRIVATE -sUSE_GLFW=3 -sALLOW_MEMORY_GROWTH=1 -sASYNCIFY=0
+                        --embed-file ${CMAKE_CURRENT_SOURCE_DIR}/assets/DejaVuSans.ttf@/DejaVuSans.ttf
                         --shell-file ${CMAKE_CURRENT_SOURCE_DIR}/web/shell.html)
     set_target_properties(kmeans_gui PROPERTIES LINK_DEPENDS
                           ${CMAKE_CURRENT_SOURCE_DIR}/web/shell.html)
 else()
+    # Absolute path, so the binary finds the font wherever it is run from.
+    target_compile_definitions(kmeans_gui PRIVATE
+                               KMEANS_GUI_FONT_FILE="${CMAKE_CURRENT_SOURCE_DIR}/assets/DejaVuSans.ttf")
     target_link_libraries(kmeans_gui PRIVATE Threads::Threads)
 endif()
