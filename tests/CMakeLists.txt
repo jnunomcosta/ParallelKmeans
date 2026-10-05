@@ -35,4 +35,14 @@ if(TARGET kmeans_cli)
     km_cli_exit_test(cli_err_n_fraction 2 gen --n 1.5 -o x.csv)
     km_cli_exit_test(cli_err_dataset_enum 2 gen --dataset gpu -o x.csv)
     km_cli_exit_test(cli_err_gen_no_output 2 gen)
+
+    add_test(NAME cli_run_input COMMAND ${KM_CLI} run --input ${CMAKE_CURRENT_BINARY_DIR}/cli_gen.csv
+                                        --k 4 --impl seq)
+    set_tests_properties(cli_run_input PROPERTIES FIXTURES_REQUIRED cli_gen_csv
+                                                  PASS_REGULAR_EXPRESSION "converged")
+    add_test(NAME cli_run COMMAND ${KM_CLI} run --n 2e4 --k 4 --impl seq)
+    set_tests_properties(cli_run PROPERTIES PASS_REGULAR_EXPRESSION "converged")
+    km_cli_exit_test(cli_err_k_zero 2 run --k 0)
+    km_cli_exit_test(cli_err_impl_gpu 2 run --impl gpu)
+    km_cli_exit_test(cli_err_input_and_dataset 2 run --input x.csv --dataset blobs)
 endif()
