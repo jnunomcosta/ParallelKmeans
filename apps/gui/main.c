@@ -247,6 +247,8 @@ static void app_run(App *app, const float *given)
     framelist_clear(&app->frames);
     view_invalidate(&app->view);
     app->shown = 0;
+    app->timeline.playing = app->autoplay;
+    app->timeline.acc = 0.0;
     app->run_k = cfg.k;
     app->message[0] = '\0';
     int err = runner_start(&app->runner, &app->ds, &cfg);
@@ -315,6 +317,8 @@ int main(int argc, char **argv)
     app.cfg.seed = o.gen.seed;
     app.trails = o.trails;
     panel_init(&app.panel);
+    timeline_init(&app.timeline);
+    app.autoplay = !o.screenshot;
     runner_init(&app.runner);
 
     int err = KM_OK;
@@ -343,10 +347,18 @@ int main(int argc, char **argv)
     {
         runner_poll(&app.runner, &app.frames);
         app.info = runner_info(&app.runner);
-        if (app.frames.count > 0)
-            app.shown = app.frames.count - 1;
-        view_layout(&app.view, (Rectangle){PANEL_W, 0, (float)(GetScreenWidth() - PANEL_W),
-                                           (float)(GetScreenHeight() - TIMELINE_H - STATS_H)});
+        if (o.screenshot)
+        {
+            /* Screenshots show --frame N (clamped), or the last frame. */
+            size_t last = app.frames.count ? app.frames.count - 1 : 0;
+            app.shown = (o.frame < 0 || (size_t)o.frame > last) ? last : (size_t)o.frame;
+        }
+        else
+            timeline_update(&app.timeline, &app.shown, app.frames.count,
+                            app.info.status != RUN_RUNNING, (double)GetFrameTime());
+        float cw = (float)(GetScreenWidth() - PANEL_W);
+        float ch = (float)(GetScreenHeight() - TIMELINE_H - STATS_H);
+        view_layout(&app.view, (Rectangle){PANEL_W, 0, cw, ch});
 
         char line[160];
         if (app.message[0])
@@ -366,6 +378,8 @@ int main(int argc, char **argv)
         DrawText("ParallelKmeans", 16, 16, 20, RAYWHITE);
         DrawText(line, 16, 48, 16, LIGHTGRAY);
         view_draw(&app.view, &app.frames, app.shown, app.run_k, app.trails);
+        timeline_draw(&app.timeline, &app.shown, app.frames.count,
+                      (Rectangle){PANEL_W, ch, cw, TIMELINE_H});
         PanelAction act = panel_draw(&app, (Rectangle){0, 0, PANEL_W, (float)GetScreenHeight()});
         EndDrawing();
 
@@ -377,6 +391,7 @@ int main(int argc, char **argv)
                 act = PANEL_RUN;
             if (IsKeyPressed(KEY_T))
                 app.trails = !app.trails;
+            timeline_keys(&app.timeline, &app.shown, app.frames.count);
         }
         if (IsKeyPressed(KEY_ESCAPE))
         {

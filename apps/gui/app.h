@@ -4,6 +4,7 @@
 #include "kmeans/kmeans.h"
 #include "panel.h"
 #include "runner.h"
+#include "timeline.h"
 #include "view.h"
 
 #define K_MAX 32
@@ -29,6 +30,8 @@ typedef struct App
     RunInfo info; /* last snapshot of the runner */
     View view;
     size_t shown; /* index of the displayed frame */
+    Timeline timeline;
+    bool autoplay; /* start playing from frame 0 on every run */
     bool trails;
     PanelState panel;
     DataSource source;

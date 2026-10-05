@@ -91,6 +91,7 @@ PanelAction panel_draw(App *app, Rectangle area)
     Rectangle r_seed = labelled(&c, "Seed");
     Rectangle r_iter = labelled(&c, "Max iter");
     Rectangle r_tol = labelled(&c, "Tol");
+    Rectangle r_speed = labelled(&c, "Speed");
 
     if (any_open(ps))
         GuiLock();
@@ -150,6 +151,12 @@ PanelAction panel_draw(App *app, Rectangle area)
     if (GuiSpinner(r_iter, NULL, &iter, 1, 10000, ps->ed_iter))
         ps->ed_iter = !ps->ed_iter;
     app->cfg.max_iter = (unsigned)iter;
+
+    float fps = (float)app->timeline.fps;
+    GuiSlider(r_speed, NULL, NULL, &fps, (float)TIMELINE_FPS_MIN, (float)TIMELINE_FPS_MAX);
+    app->timeline.fps = (int)lroundf(fps);
+    snprintf(buf, sizeof buf, "%d fps", app->timeline.fps);
+    DrawText(buf, (int)(r_speed.x + r_speed.width - 50), (int)r_speed.y + 5, 14, WHITE);
 
     Rectangle b = next_row(&c);
     float bw = b.width / 2 - 2;
