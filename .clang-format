@@ -1,0 +1,5 @@
+BasedOnStyle: Microsoft
+ColumnLimit: 100
+IndentPPDirectives: None
+PointerAlignment: Right
+SortIncludes: CaseSensitive

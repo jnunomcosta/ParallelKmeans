@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ParallelKmeans</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #181a1e; }
+  body { display: flex; align-items: center; justify-content: center; }
+  /* The canvas is 1280x800; scale it to fit while keeping the aspect ratio. */
+  canvas { display: block; width: min(100vw, 160vh); height: auto; outline: none; }
+  p { position: fixed; left: 12px; bottom: 8px; margin: 0; max-width: 256px;
+      font: 12px system-ui, sans-serif; color: #8a8f98; }
+  a { color: #8fb4e8; }
+</style>
+</style>
+</head>
+<body>
+<canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
+<p>Single-threaded browser build of <a href="https://github.com/jnunomcosta/ParallelKmeans">ParallelKmeans</a>.</p>
+<script>
+  var Module = { canvas: document.getElementById("canvas") };
+</script>
+{{{ SCRIPT }}}
+</body>
+</html>

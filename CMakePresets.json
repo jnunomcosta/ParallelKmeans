@@ -1,0 +1,93 @@
+{
+    "version": 3,
+    "cmakeMinimumRequired": { "major": 3, "minor": 21, "patch": 0 },
+    "configurePresets": [
+        {
+            "name": "base",
+            "hidden": true,
+            "binaryDir": "${sourceDir}/build/${presetName}"
+        },
+        {
+            "name": "debug",
+            "inherits": "base",
+            "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+        },
+        {
+            "name": "release",
+            "inherits": "base",
+            "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+        },
+        {
+            "name": "asan",
+            "inherits": "base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "KMEANS_SANITIZE": "address,undefined"
+            }
+        },
+        {
+            "name": "ci",
+            "inherits": "base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "KMEANS_NATIVE": "OFF",
+                "KMEANS_WERROR": "ON"
+            }
+        },
+        {
+            "name": "gui",
+            "inherits": "base",
+            "cacheVariables": { "CMAKE_BUILD_TYPE": "Release", "KMEANS_GUI": "ON" }
+        },
+        {
+            "name": "web",
+            "description": "WebAssembly GUI. Needs Emscripten: source emsdk_env.sh (sets EMSDK), then cmake --preset web && cmake --build --preset web. Equivalent: emcmake cmake -B build/web -DCMAKE_BUILD_TYPE=Release -DKMEANS_NATIVE=OFF",
+            "inherits": "base",
+            "toolchainFile": "$env{EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "KMEANS_NATIVE": "OFF",
+                "KMEANS_GUI": "ON"
+            }
+        }
+    ],
+    "buildPresets": [
+        { "name": "debug", "configurePreset": "debug" },
+        { "name": "release", "configurePreset": "release" },
+        { "name": "asan", "configurePreset": "asan" },
+        { "name": "ci", "configurePreset": "ci" },
+        { "name": "gui", "configurePreset": "gui" },
+        { "name": "web", "configurePreset": "web" }
+    ],
+    "testPresets": [
+        {
+            "name": "debug",
+            "configurePreset": "debug",
+            "output": { "outputOnFailure": true }
+        },
+        {
+            "name": "release",
+            "configurePreset": "release",
+            "output": { "outputOnFailure": true }
+        },
+        {
+            "name": "asan",
+            "configurePreset": "asan",
+            "output": { "outputOnFailure": true },
+            "environment": {
+                "ASAN_OPTIONS": "detect_leaks=1",
+                "UBSAN_OPTIONS": "print_stacktrace=1:halt_on_error=1"
+            }
+        },
+        {
+            "name": "ci",
+            "configurePreset": "ci",
+            "output": { "outputOnFailure": true }
+        },
+        {
+            "name": "gui",
+            "configurePreset": "gui",
+            "output": { "outputOnFailure": true }
+        }
+    ]
+}
