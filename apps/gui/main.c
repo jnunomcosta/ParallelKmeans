@@ -258,10 +258,13 @@ int main(int argc, char **argv)
     app.cfg.impl = o.impl;
     app.cfg.threads = o.threads;
     app.cfg.seed = o.gen.seed;
+    app.trails = o.trails;
     runner_init(&app.runner);
 
     int err =
         o.input ? km_dataset_load_csv(&app.ds, o.input) : km_dataset_generate(&app.ds, &app.gen);
+    if (err == KM_OK)
+        err = view_set_dataset(&app.view, &app.ds, app.gen.seed);
     if (err == KM_OK)
         err = runner_start(&app.runner, &app.ds, &app.cfg);
     if (err != KM_OK)
@@ -276,6 +279,10 @@ int main(int argc, char **argv)
     {
         runner_poll(&app.runner, &app.frames);
         app.info = runner_info(&app.runner);
+        if (app.frames.count > 0)
+            app.shown = app.frames.count - 1;
+        view_layout(&app.view, (Rectangle){PANEL_W, 0, (float)(GetScreenWidth() - PANEL_W),
+                                           (float)(GetScreenHeight() - TIMELINE_H - STATS_H)});
 
         char line[160];
         if (app.info.status == RUN_RUNNING)
@@ -289,9 +296,10 @@ int main(int argc, char **argv)
 
         BeginDrawing();
         ClearBackground(bg);
-        DrawText("ParallelKmeans", 24, 24, 32, RAYWHITE);
-        DrawText("K-Means visualizer", 24, 64, 20, GRAY);
-        DrawText(line, 24, 100, 20, RAYWHITE);
+        DrawRectangle(0, 0, PANEL_W, GetScreenHeight(), (Color){32, 35, 40, 255});
+        DrawText("ParallelKmeans", 16, 16, 20, RAYWHITE);
+        DrawText(line, 16, 48, 16, LIGHTGRAY);
+        view_draw(&app.view, &app.frames, app.shown, app.cfg.k, app.trails);
         EndDrawing();
 
         if (o.screenshot && app.info.status != RUN_RUNNING && ++settled >= 5)
@@ -307,6 +315,7 @@ int main(int argc, char **argv)
         }
     }
     runner_free(&app.runner);
+    view_free(&app.view);
     framelist_free(&app.frames);
     km_dataset_free(&app.ds);
     CloseWindow();

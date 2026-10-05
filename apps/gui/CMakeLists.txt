@@ -17,7 +17,7 @@ FetchContent_MakeAvailable(raygui)
 
 find_package(Threads REQUIRED)
 
-add_executable(kmeans_gui main.c runner.c)
+add_executable(kmeans_gui main.c runner.c view.c palette.c)
 set_target_properties(kmeans_gui PROPERTIES OUTPUT_NAME kmeans-gui)
 target_link_libraries(kmeans_gui PRIVATE kmeans::kmeans raylib Threads::Threads m)
 target_link_libraries(kmeans_gui PRIVATE kmeans_warnings)
