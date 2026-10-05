@@ -3,6 +3,7 @@
 #include "app.h"
 #include "kmeans/kmeans.h"
 #include "panel.h"
+#include "stats.h"
 #include "view.h"
 
 #include <raylib.h>
@@ -258,6 +259,26 @@ static void app_run(App *app, const float *given)
         app_message(app, "run", err);
 }
 
+static void app_compare(App *app)
+{
+    if (app->cfg.k > app->ds.n)
+    {
+        snprintf(app->message, sizeof app->message, "k must not exceed n");
+        return;
+    }
+    app->message[0] = '\0';
+    /* Finish a run in flight first, so that its numbers and frames are not lost. */
+    runner_cancel(&app->runner);
+    runner_join(&app->runner);
+    runner_poll(&app->runner, &app->frames);
+    RunInfo prev = runner_info(&app->runner);
+    if (!prev.is_compare && prev.status != RUN_IDLE)
+        app->last_run = prev;
+    int err = runner_compare(&app->runner, &app->ds, &app->cfg);
+    if (err != KM_OK)
+        app_message(app, "compare", err);
+}
+
 /* New data from the current source, then a run on it. */
 static void app_generate(App *app)
 {
@@ -465,6 +486,13 @@ int main(int argc, char **argv)
     {
         runner_poll(&app.runner, &app.frames);
         app.info = runner_info(&app.runner);
+        if (!app.info.is_compare && app.info.status != RUN_IDLE)
+            app.last_run = app.info;
+        if (app.info.is_compare && app.info.compare_ready)
+        {
+            app.compare = app.info.compare;
+            app.has_compare = true;
+        }
         if (o.screenshot)
         {
             /* Screenshots show --frame N (clamped), or the last frame. */
@@ -483,6 +511,10 @@ int main(int argc, char **argv)
         char line[160];
         if (app.message[0])
             snprintf(line, sizeof line, "%s", app.message);
+        else if (app.info.is_compare && app.info.status == RUN_RUNNING)
+            snprintf(line, sizeof line, "comparing seq vs omp...");
+        else if (app.info.is_compare && app.info.status == RUN_DONE)
+            snprintf(line, sizeof line, "comparison done");
         else if (app.info.status == RUN_RUNNING)
             snprintf(line, sizeof line, "running... iter %u", app.info.iterations);
         else if (app.info.status == RUN_DONE)
@@ -500,6 +532,7 @@ int main(int argc, char **argv)
         view_draw(&app.view, &app.frames, app.shown, app.run_k, app.trails, app.voronoi);
         timeline_draw(&app.timeline, &app.shown, app.frames.count,
                       (Rectangle){PANEL_W, ch, cw, TIMELINE_H});
+        stats_draw(&app, (Rectangle){PANEL_W, ch + TIMELINE_H, cw, STATS_H});
         PanelAction act = panel_draw(&app, (Rectangle){0, 0, PANEL_W, (float)GetScreenHeight()});
         EndDrawing();
 
@@ -528,6 +561,8 @@ int main(int argc, char **argv)
             app_generate(&app);
         else if (act == PANEL_RUN)
             app_run(&app, NULL);
+        else if (act == PANEL_COMPARE)
+            app_compare(&app);
         else if (act == PANEL_CLEAR)
             app_clear(&app);
 

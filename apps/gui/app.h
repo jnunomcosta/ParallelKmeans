@@ -27,7 +27,10 @@ typedef struct App
     km_config cfg;
     Runner runner;
     FrameList frames;
-    RunInfo info; /* last snapshot of the runner */
+    RunInfo info;     /* last snapshot of the runner */
+    RunInfo last_run; /* last snapshot of a clustering run (not a comparison) */
+    CompareResult compare;
+    bool has_compare;
     View view;
     size_t shown; /* index of the displayed frame */
     Timeline timeline;

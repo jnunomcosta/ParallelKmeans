@@ -165,14 +165,17 @@ PanelAction panel_draw(App *app, Rectangle area)
     if (GuiButton((Rectangle){b.x + bw + 4, b.y, bw, b.height}, "Run (R)"))
         action = PANEL_RUN;
 
-    Rectangle cl = next_row(&c);
-    if (GuiButton((Rectangle){cl.x, cl.y, bw, cl.height}, "Clear points"))
+    Rectangle cp = next_row(&c);
+    if (GuiButton((Rectangle){cp.x, cp.y, bw, cp.height}, "Compare"))
+        action = PANEL_COMPARE;
+    if (GuiButton((Rectangle){cp.x + bw + 4, cp.y, bw, cp.height}, "Clear points"))
         action = PANEL_CLEAR;
-    GuiCheckBox((Rectangle){cl.x + bw + 12, cl.y + 4, 16, 16}, "Brush", &app->brush);
 
     Rectangle t = next_row(&c);
     GuiCheckBox((Rectangle){t.x, t.y + 4, 16, 16}, "Voronoi (V)", &app->voronoi);
     GuiCheckBox((Rectangle){t.x + 130, t.y + 4, 16, 16}, "Trails (T)", &app->trails);
+    Rectangle t2 = next_row(&c);
+    GuiCheckBox((Rectangle){t2.x, t2.y + 4, 16, 16}, "Brush", &app->brush);
 
     GuiUnlock();
 

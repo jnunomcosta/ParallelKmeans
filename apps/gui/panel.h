@@ -10,7 +10,8 @@ typedef enum
     PANEL_NONE,
     PANEL_GENERATE,
     PANEL_RUN,
-    PANEL_CLEAR
+    PANEL_CLEAR,
+    PANEL_COMPARE
 } PanelAction;
 
 /* Widget state that raygui needs between frames. */

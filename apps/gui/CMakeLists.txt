@@ -23,7 +23,7 @@ target_include_directories(raygui_impl SYSTEM PUBLIC ${raygui_SOURCE_DIR}/src)
 target_link_libraries(raygui_impl PUBLIC raylib)
 target_compile_options(raygui_impl PRIVATE -w)
 
-add_executable(kmeans_gui main.c runner.c view.c palette.c panel.c timeline.c)
+add_executable(kmeans_gui main.c runner.c view.c palette.c panel.c timeline.c stats.c)
 set_target_properties(kmeans_gui PROPERTIES OUTPUT_NAME kmeans-gui)
 target_link_libraries(kmeans_gui PRIVATE kmeans::kmeans raygui_impl raylib Threads::Threads m)
 target_link_libraries(kmeans_gui PRIVATE kmeans_warnings)
